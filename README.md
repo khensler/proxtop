@@ -47,19 +47,6 @@ proxtop (formerly kvmtop) measures resource utilization from outside the VM at t
 
 proxtop auto-detects whether you're running standard libvirt-based KVM or Proxmox VE and uses the appropriate connector (libvirt API or QMP sockets).
 
-The conceptual idea behind proxtop is scientifically published and described in "Reviewing Cloud Monitoring: Towards Cloud Resource Profiling."
-
-```
-@inproceedings{hauser2018reviewing,
-  title={Reviewing Cloud Monitoring: Towards Cloud Resource Profiling},
-  author={Hauser, Christopher B and Wesner, Stefan},
-  booktitle={2018 IEEE 11th International Conference on Cloud Computing (CLOUD)},
-  pages={678--685},
-  year={2018},
-  organization={IEEE}
-}
-```
-
 *What does proxtop offer?*
 
 The command line tool can be used by sysadmins, using a console ui (ncurses). Text or JSON output further allows to process the monitoring data. A built-in TCP output allows to send the data directly to a monitoring data sink, e.g. logstash.
