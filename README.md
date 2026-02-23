@@ -118,7 +118,7 @@ Help Options:
 
 ```
 
-Exemplary output
+Example output
 ```
 UUID                                 name          cpu_cores cpu_total cpu_steal cpu_other_total cpu_other_steal
 0dbe2ae8-1ee4-4b43-bdf3-b533dfe75486 ubuntu14.04-2 2         53        0         5               1
