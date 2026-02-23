@@ -4,7 +4,16 @@ import (
 	"fmt"
 	"proxtop/config"
 	"proxtop/models"
+	"proxtop/util"
 )
+
+// formatMemValue formats a memory value, optionally in human-readable format
+func formatMemValue(value string) string {
+	if config.Options.HumanReadable {
+		return util.FormatBytesFromString(value)
+	}
+	return value
+}
 
 func domainPrint(domain *models.Domain) []string {
 	// esxtop style: MEMSZ (configured memory), GRANT (used), RSS (resident)
@@ -39,10 +48,19 @@ func domainPrint(domain *models.Domain) []string {
 	majflt := domain.GetMetricDiffUint64("ram_majflt", false)
 	cmajflt := domain.GetMetricDiffUint64("ram_cmajflt", false)
 
+	// Format memory values (human-readable if enabled)
+	totalFmt := formatMemValue(total)
+	usedFmt := formatMemValue(used)
+	freeMemFmt := formatMemValue(freeMem)
+	rssFmt := formatMemValue(rss)
+	actualMemFmt := formatMemValue(actualMem)
+
 	// Default fields: MEMSZ, GRANT, FREE, %ACTV, RSS, MCTL, MINFLT, MAJFLT
-	result := append([]string{total}, used, freeMem, activePct, rss, actualMem, minflt, majflt)
+	result := append([]string{totalFmt}, usedFmt, freeMemFmt, activePct, rssFmt, actualMemFmt, minflt, majflt)
 	if config.Options.Verbose {
-		result = append(result, maxMem, vsize, swapIn, swapOut, cminflt, cmajflt)
+		maxMemFmt := formatMemValue(maxMem)
+		vsizeFmt := formatMemValue(vsize)
+		result = append(result, maxMemFmt, vsizeFmt, swapIn, swapOut, cminflt, cmajflt)
 	}
 
 	return result

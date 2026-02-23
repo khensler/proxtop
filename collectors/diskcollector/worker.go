@@ -162,6 +162,14 @@ func diskCollect(domain *models.Domain, host *models.Host) {
 	domain.AddMetricMeasurement("disk_ioutil", models.CreateMeasurement(domainIOUtil))
 }
 
+// formatDiskSize formats a disk size value, optionally in human-readable format
+func formatDiskSize(value string) string {
+	if config.Options.HumanReadable {
+		return util.FormatBytesFromString(value)
+	}
+	return value
+}
+
 func diskPrint(domain *models.Domain) []string {
 	capacity, _ := domain.GetMetricUint64("disk_size_capacity", 0)
 	allocation, _ := domain.GetMetricUint64("disk_size_allocation", 0)
@@ -214,15 +222,20 @@ func diskPrint(domain *models.Domain) []string {
 		latAvg = "0.00"
 	}
 
+	// Format disk sizes (human-readable if enabled)
+	capacityFmt := formatDiskSize(capacity)
+	allocationFmt := formatDiskSize(allocation)
+
 	// Default: SIZE, ALLOC, %UTIL, READS/s, WRITES/s, MBRD/s, MBWR/s, LAT/rd, LAT/wr, LAT/fl, LAT/avg
-	result := append([]string{capacity}, allocation, ioutil, rdreq, wrreq, mbRead, mbWrite, latRd, latWr, latFl, latAvg)
+	result := append([]string{capacityFmt}, allocationFmt, ioutil, rdreq, wrreq, mbRead, mbWrite, latRd, latWr, latFl, latAvg)
 	if config.Options.Verbose {
 		flushreq := fmt.Sprintf("%.0f", flushreqFloat)
 		// Total time breakdown (in ms)
 		rdTotalMs := fmt.Sprintf("%.0f", rdtotaltimesFloat/1000000)
 		wrTotalMs := fmt.Sprintf("%.0f", wrtotaltimesFloat/1000000)
 		flTotalMs := fmt.Sprintf("%.0f", flushtotaltimesFloat/1000000)
-		result = append(result, physical, flushreq, rdTotalMs, wrTotalMs, flTotalMs, delayblkio)
+		physicalFmt := formatDiskSize(physical)
+		result = append(result, physicalFmt, flushreq, rdTotalMs, wrTotalMs, flTotalMs, delayblkio)
 	}
 	return result
 }

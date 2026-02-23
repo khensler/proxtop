@@ -6,8 +6,9 @@ type OptionsType struct {
 	Frequency  int    `short:"f" long:"frequency" description:"Frequency (in seconds) for collecting metrics" default:"2"`
 	Runs       int    `short:"r" long:"runs" description:"Amount of collection runs" default:"-1"`
 	LibvirtURI string `short:"c" long:"connection" description:"connection uri to libvirt daemon" default:"qemu:///system"`
-	ProcFS     string `long:"procfs" description:"path to the proc filesystem" default:"/proc"`
-	Verbose    bool   `long:"verbose" description:"Verbose output, adds more detailed fields"`
+	ProcFS        string `long:"procfs" description:"path to the proc filesystem" default:"/proc"`
+	Verbose       bool   `long:"verbose" description:"Verbose output, adds more detailed fields"`
+	HumanReadable bool   `short:"H" long:"human" description:"Display sizes in human readable format (KB, MB, GB)"`
 
 	// Hypervisor type selection (auto-detected by default)
 	Proxmox bool `long:"proxmox" description:"Force Proxmox VE connector (auto-detected by default)"`

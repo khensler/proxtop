@@ -42,7 +42,8 @@ type NcursesPrinter struct {
 }
 
 const HOSTWINHEIGHT = 5
-const DOMAINMAXFIELDWIDTH = 12  // Increased from 8 for better alignment
+const DOMAINMINFIELDWIDTH = 8   // Minimum column width
+const DOMAINMAXFIELDWIDTH = 14  // Maximum column width to prevent overflow
 const HOSTFIELDWIDTH = 10       // Width for host field names
 const HOSTVALUEWIDTH = 12       // Width for host values
 
@@ -179,6 +180,8 @@ func handleInput() bool {
 		if config.Options.Frequency > 1 {
 			config.Options.Frequency--
 		}
+	case 'u', 'U': // Toggle human-readable units
+		config.Options.HumanReadable = !config.Options.HumanReadable
 	}
 	return false
 }
@@ -333,8 +336,12 @@ func (printer *NcursesPrinter) Screen(printable models.Printable) {
 	if actualInterval < 0.1 {
 		actualInterval = float64(config.Options.Frequency) // First run, use target
 	}
-	statusLine := fmt.Sprintf(" proxtop | View: %s | Refresh: %.1fs (target: %ds, +/-) | 'h' help, 'q' quit ",
-		getViewModeName(), actualInterval, config.Options.Frequency)
+	unitsIndicator := ""
+	if config.Options.HumanReadable {
+		unitsIndicator = " [H]"
+	}
+	statusLine := fmt.Sprintf(" proxtop | View: %s%s | Refresh: %.1fs (+/-) | 'h' help, 'u' units, 'q' quit ",
+		getViewModeName(), unitsIndicator, actualInterval)
 	for len(statusLine) < maxx {
 		statusLine += " "
 	}
@@ -547,7 +554,7 @@ func filterHostFieldsByView(fields []string, values []string) ([]string, []strin
 func printHelpOverlay(maxy, maxx int) {
 	// Center the help box
 	helpWidth := 50
-	helpHeight := 26
+	helpHeight := 28
 	startY := (maxy - helpHeight) / 2
 	startX := (maxx - helpWidth) / 2
 
@@ -567,7 +574,7 @@ func printHelpOverlay(maxy, maxx int) {
 		screen.Printf("proxtop - Keybindings (press 'h' to close)")
 		screen.AttrOff(goncurses.A_BOLD)
 		screen.Move(3, 2)
-		screen.Printf("a/c/m/d/n/i - View modes | +/- Refresh | q - Quit")
+		screen.Printf("a/c/m/d/n/i - View modes | u - Units | q - Quit")
 		screen.Refresh()
 		return
 	}
@@ -606,19 +613,21 @@ func printHelpOverlay(maxy, maxx int) {
 	helpWin.Printf("> - Sort by next column")
 
 	helpWin.Move(17, 2)
-	helpWin.Printf("Refresh Interval:")
+	helpWin.Printf("Display:")
 	helpWin.Move(18, 4)
-	helpWin.Printf("+ - Increase interval (slower)")
+	helpWin.Printf("u - Toggle human-readable units (KB/MB/GB)")
 	helpWin.Move(19, 4)
-	helpWin.Printf("- - Decrease interval (faster)")
+	helpWin.Printf("+ - Increase refresh interval (slower)")
+	helpWin.Move(20, 4)
+	helpWin.Printf("- - Decrease refresh interval (faster)")
 
-	helpWin.Move(21, 2)
+	helpWin.Move(22, 2)
 	helpWin.Printf("Other:")
-	helpWin.Move(22, 4)
-	helpWin.Printf("f - Field selector (show/hide columns)")
 	helpWin.Move(23, 4)
-	helpWin.Printf("h/? - Toggle this help")
+	helpWin.Printf("f - Field selector (show/hide columns)")
 	helpWin.Move(24, 4)
+	helpWin.Printf("h/? - Toggle this help")
+	helpWin.Move(25, 4)
 	helpWin.Printf("q   - Quit (also Ctrl+C)")
 
 	helpWin.NoutRefresh()
@@ -845,23 +854,29 @@ func printDomain(window *goncurses.Window, fields []string, values map[string][]
 	// Reset column widths for this view
 	domainColumnWidths = make([]int, len(fields))
 
-	// Calculate optimal column widths based on field names and data
+	// Calculate optimal column widths based on field names
 	for colID, field := range fields {
 		fieldParts := strings.Split(field, "_")
 		fieldName := fieldParts[len(fieldParts)-1]
+		// Start with field name length, but ensure minimum width
 		domainColumnWidths[colID] = len(fieldName)
-		if domainColumnWidths[colID] < DOMAINMAXFIELDWIDTH {
-			domainColumnWidths[colID] = DOMAINMAXFIELDWIDTH
+		if domainColumnWidths[colID] < DOMAINMINFIELDWIDTH {
+			domainColumnWidths[colID] = DOMAINMINFIELDWIDTH
 		}
 	}
 
-	// Check data widths
+	// Expand columns based on data widths, but cap at max
 	for _, vals := range values {
 		for colID, val := range vals {
-			if colID < len(domainColumnWidths) && len(val) > domainColumnWidths[colID] {
-				domainColumnWidths[colID] = len(val)
-				if domainColumnWidths[colID] > DOMAINMAXFIELDWIDTH {
-					domainColumnWidths[colID] = DOMAINMAXFIELDWIDTH
+			if colID < len(domainColumnWidths) {
+				dataLen := len(val)
+				if dataLen > domainColumnWidths[colID] {
+					// Expand column up to max width
+					if dataLen <= DOMAINMAXFIELDWIDTH {
+						domainColumnWidths[colID] = dataLen
+					} else {
+						domainColumnWidths[colID] = DOMAINMAXFIELDWIDTH
+					}
 				}
 			}
 		}
@@ -958,8 +973,11 @@ func prepareForCell(content string, columnID int) string {
 
 func fitInCell(content string) string {
 	if len(content) > DOMAINMAXFIELDWIDTH {
-		tmp := strings.Split(content, "")
-		content = strings.Join(tmp[0:DOMAINMAXFIELDWIDTH], "")
+		// Truncate with "..." to indicate overflow
+		if DOMAINMAXFIELDWIDTH > 3 {
+			return content[:DOMAINMAXFIELDWIDTH-3] + "..."
+		}
+		return content[:DOMAINMAXFIELDWIDTH]
 	}
 	return content
 }
@@ -983,9 +1001,13 @@ func expandCell(content string, columnID int) string {
 	return content
 }
 
-// padRight pads a string to a fixed width, truncating if necessary
+// padRight pads a string to a fixed width, truncating with "..." if necessary
 func padRight(s string, width int) string {
 	if len(s) > width {
+		// Truncate with "..." to indicate overflow
+		if width > 3 {
+			return s[:width-3] + "..."
+		}
 		return s[:width]
 	}
 	for len(s) < width {
