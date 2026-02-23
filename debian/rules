@@ -1,0 +1,27 @@
+#!/usr/bin/make -f
+
+export DH_VERBOSE = 1
+export GOCACHE = $(CURDIR)/.gocache
+export GOFLAGS = -mod=readonly
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	CGO_ENABLED=1 go build -ldflags="-s -w" -o proxtop ./cmd/proxtop
+	CGO_ENABLED=1 go build -ldflags="-s -w" -o proxprofiler ./cmd/proxprofiler
+
+override_dh_auto_install:
+	install -D -m 0755 proxtop $(CURDIR)/debian/proxtop/usr/bin/proxtop
+	install -D -m 0755 proxprofiler $(CURDIR)/debian/proxtop/usr/bin/proxprofiler
+	install -D -m 0644 pkgbuild/proxtop.conf $(CURDIR)/debian/proxtop/etc/proxtop.conf
+	install -D -m 0644 pkgbuild/proxtop.service $(CURDIR)/debian/proxtop/lib/systemd/system/proxtop.service
+	install -D -m 0644 pkgbuild/proxprofiler.service $(CURDIR)/debian/proxtop/lib/systemd/system/proxprofiler.service
+
+override_dh_auto_test:
+	# Skip tests during package build
+
+override_dh_auto_clean:
+	rm -f proxtop proxprofiler
+	rm -rf .gocache
+

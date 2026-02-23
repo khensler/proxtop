@@ -1,0 +1,32 @@
+Source: proxtop
+Section: admin
+Priority: optional
+Maintainer: proxtop maintainers <proxtop@example.com>
+Build-Depends: debhelper-compat (= 13),
+               golang-go (>= 2:1.18) | golang-1.21-go,
+               libvirt-dev,
+               libncurses-dev,
+               pkg-config
+Standards-Version: 4.6.2
+Homepage: https://github.com/your-org/proxtop
+Rules-Requires-Root: no
+
+Package: proxtop
+Architecture: amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}, libvirt0, libncurses5 | libncurses6
+Description: VM monitoring tool for KVM and Proxmox VE hypervisors
+ proxtop (formerly kvmtop) monitors virtual machine resource utilization
+ from the hypervisor level, measuring the real resource consumption
+ including overhead.
+ .
+ Features:
+  - Hypervisor-level metrics from /proc, libvirt, and QMP
+  - CPU steal time and overhead detection
+  - Noisy neighbor identification
+  - Multiple output formats: ncurses, text, JSON
+  - TCP streaming to monitoring systems
+  - Auto-detection of KVM and Proxmox VE environments
+ .
+ This package contains the proxtop monitoring tool and proxprofiler
+ statistical profiling tool.
+

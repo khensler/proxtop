@@ -1,0 +1,9 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: proxtop
+Source: https://github.com/your-org/proxtop
+
+Files: *
+Copyright: 2018-2026 proxtop contributors
+License: MIT or Apache-2.0
+ See LICENSE file for full license text.
+

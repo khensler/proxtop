@@ -1,0 +1,24 @@
+#!/bin/bash
+set -e
+
+case "$1" in
+    configure)
+        systemctl daemon-reload
+        echo ""
+        echo "proxtop has been installed successfully."
+        echo ""
+        echo "Configuration:"
+        echo "  Edit /etc/proxtop.conf to set your target server"
+        echo ""
+        echo "Usage:"
+        echo "  Interactive mode:  proxtop --cpu --mem --net --disk"
+        echo "  Enable service:    systemctl enable proxtop"
+        echo "  Start service:     systemctl start proxtop"
+        echo ""
+        ;;
+esac
+
+#DEBHELPER#
+
+exit 0
+

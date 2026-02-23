@@ -1,0 +1,6 @@
+proxtop usr/bin
+proxprofiler usr/bin
+pkgbuild/proxtop.conf etc
+pkgbuild/proxtop.service lib/systemd/system
+pkgbuild/proxprofiler.service lib/systemd/system
+

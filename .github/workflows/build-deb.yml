@@ -1,0 +1,165 @@
+name: Build Debian Packages
+
+on:
+  push:
+    branches: [main, master]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+env:
+  GO_VERSION: '1.21'
+
+jobs:
+  build-deb:
+    runs-on: ubuntu-22.04
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libvirt-dev \
+            libncurses5-dev \
+            pkg-config \
+            dpkg-dev \
+            debhelper \
+            devscripts \
+            fakeroot
+
+      - name: Get version
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#v}"
+          else
+            VERSION="0.0.0-$(git rev-parse --short HEAD)"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Build binaries
+        run: |
+          CGO_ENABLED=1 go build -ldflags="-s -w" -o proxtop ./cmd/proxtop
+          CGO_ENABLED=1 go build -ldflags="-s -w" -o proxprofiler ./cmd/proxprofiler
+
+      - name: Create Debian package structure
+        run: |
+          PKG_NAME="proxtop"
+          PKG_VERSION="${{ steps.version.outputs.version }}"
+          PKG_DIR="${PKG_NAME}_${PKG_VERSION}_amd64"
+          
+          mkdir -p ${PKG_DIR}/DEBIAN
+          mkdir -p ${PKG_DIR}/usr/bin
+          mkdir -p ${PKG_DIR}/etc
+          mkdir -p ${PKG_DIR}/lib/systemd/system
+          
+          # Copy binaries
+          cp proxtop ${PKG_DIR}/usr/bin/
+          cp proxprofiler ${PKG_DIR}/usr/bin/
+          chmod 755 ${PKG_DIR}/usr/bin/proxtop
+          chmod 755 ${PKG_DIR}/usr/bin/proxprofiler
+          
+          # Copy config and service files
+          cp pkgbuild/proxtop.conf ${PKG_DIR}/etc/proxtop.conf
+          cp pkgbuild/proxtop.service ${PKG_DIR}/lib/systemd/system/
+          cp pkgbuild/proxprofiler.service ${PKG_DIR}/lib/systemd/system/
+          
+          # Create control file
+          cat > ${PKG_DIR}/DEBIAN/control << 'CTRLEOF'
+          Package: proxtop
+          Version: ${PKG_VERSION}
+          Section: admin
+          Priority: optional
+          Architecture: amd64
+          Depends: libc6, libvirt0, libncurses5 | libncurses6
+          Maintainer: proxtop maintainers
+          Description: VM monitoring tool for KVM and Proxmox VE
+           proxtop monitors virtual machine resource utilization from the
+           hypervisor level, measuring the real resource consumption including
+           overhead. It helps identify resource shortcomings and the "noisy
+           neighbor" effect in virtualized environments.
+          CTRLEOF
+          # Fix control file - remove leading spaces and substitute version
+          sed -i 's/^          //' ${PKG_DIR}/DEBIAN/control
+          sed -i "s/\${PKG_VERSION}/${PKG_VERSION}/" ${PKG_DIR}/DEBIAN/control
+
+          # Create conffiles (mark config files)
+          echo "/etc/proxtop.conf" > ${PKG_DIR}/DEBIAN/conffiles
+
+          # Create postinst script
+          cat > ${PKG_DIR}/DEBIAN/postinst << 'POSTINSTEOF'
+          #!/bin/bash
+          set -e
+          systemctl daemon-reload
+          echo "proxtop installed successfully."
+          echo "Edit /etc/proxtop.conf to configure the target server."
+          echo "Enable with: systemctl enable proxtop"
+          echo "Start with: systemctl start proxtop"
+          POSTINSTEOF
+          sed -i 's/^          //' ${PKG_DIR}/DEBIAN/postinst
+          chmod 755 ${PKG_DIR}/DEBIAN/postinst
+
+          # Create prerm script
+          cat > ${PKG_DIR}/DEBIAN/prerm << 'PRERMEOF'
+          #!/bin/bash
+          set -e
+          if systemctl is-active --quiet proxtop; then
+            systemctl stop proxtop
+          fi
+          if systemctl is-active --quiet proxprofiler; then
+            systemctl stop proxprofiler
+          fi
+          PRERMEOF
+          sed -i 's/^          //' ${PKG_DIR}/DEBIAN/prerm
+          chmod 755 ${PKG_DIR}/DEBIAN/prerm
+
+          # Create postrm script
+          cat > ${PKG_DIR}/DEBIAN/postrm << 'POSTRMEOF'
+          #!/bin/bash
+          set -e
+          systemctl daemon-reload
+          POSTRMEOF
+          sed -i 's/^          //' ${PKG_DIR}/DEBIAN/postrm
+          chmod 755 ${PKG_DIR}/DEBIAN/postrm
+
+      - name: Build Debian package
+        run: |
+          PKG_NAME="proxtop"
+          PKG_VERSION="${{ steps.version.outputs.version }}"
+          PKG_DIR="${PKG_NAME}_${PKG_VERSION}_amd64"
+          
+          dpkg-deb --build ${PKG_DIR}
+          
+          # Verify the package
+          dpkg-deb --info ${PKG_DIR}.deb
+          dpkg-deb --contents ${PKG_DIR}.deb
+
+      - name: Upload Debian package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: proxtop-deb-amd64
+          path: "*.deb"
+          retention-days: 30
+
+      - name: Upload to Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: "*.deb"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
