@@ -33,11 +33,7 @@ jobs:
           sudo apt-get install -y \
             libvirt-dev \
             libncurses5-dev \
-            pkg-config \
-            dpkg-dev \
-            debhelper \
-            devscripts \
-            fakeroot
+            pkg-config
 
       - name: Get version
         id: version
