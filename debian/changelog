@@ -1,4 +1,7 @@
 proxtop (1.1.2-1) stable; urgency=medium
+  * Fixed per interface network display
+
+proxtop (1.1.2-1) stable; urgency=medium
 
   * Added sort direction toggle ('r' keybind) - ascending/descending
   * Added sort direction indicators (^/v) in column headers

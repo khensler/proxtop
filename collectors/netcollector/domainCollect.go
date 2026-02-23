@@ -26,10 +26,18 @@ func domainCollect(domain *models.Domain) {
 		domain.AddMetricMeasurement(fmt.Sprintf("net_ReceivedPackets_%s", devname), models.CreateMeasurement(uint64(devStats.ReceivedPackets)))
 		domain.AddMetricMeasurement(fmt.Sprintf("net_ReceivedErrs_%s", devname), models.CreateMeasurement(uint64(devStats.ReceivedErrs)))
 		domain.AddMetricMeasurement(fmt.Sprintf("net_ReceivedDrop_%s", devname), models.CreateMeasurement(uint64(devStats.ReceivedDrop)))
+		domain.AddMetricMeasurement(fmt.Sprintf("net_ReceivedFifo_%s", devname), models.CreateMeasurement(uint64(devStats.ReceivedFifo)))
+		domain.AddMetricMeasurement(fmt.Sprintf("net_ReceivedFrame_%s", devname), models.CreateMeasurement(uint64(devStats.ReceivedFrame)))
+		domain.AddMetricMeasurement(fmt.Sprintf("net_ReceivedCompressed_%s", devname), models.CreateMeasurement(uint64(devStats.ReceivedCompressed)))
+		domain.AddMetricMeasurement(fmt.Sprintf("net_ReceivedMulticast_%s", devname), models.CreateMeasurement(uint64(devStats.ReceivedMulticast)))
 		domain.AddMetricMeasurement(fmt.Sprintf("net_TransmittedBytes_%s", devname), models.CreateMeasurement(uint64(devStats.TransmittedBytes)))
 		domain.AddMetricMeasurement(fmt.Sprintf("net_TransmittedPackets_%s", devname), models.CreateMeasurement(uint64(devStats.TransmittedPackets)))
 		domain.AddMetricMeasurement(fmt.Sprintf("net_TransmittedErrs_%s", devname), models.CreateMeasurement(uint64(devStats.TransmittedErrs)))
 		domain.AddMetricMeasurement(fmt.Sprintf("net_TransmittedDrop_%s", devname), models.CreateMeasurement(uint64(devStats.TransmittedDrop)))
+		domain.AddMetricMeasurement(fmt.Sprintf("net_TransmittedFifo_%s", devname), models.CreateMeasurement(uint64(devStats.TransmittedFifo)))
+		domain.AddMetricMeasurement(fmt.Sprintf("net_TransmittedColls_%s", devname), models.CreateMeasurement(uint64(devStats.TransmittedColls)))
+		domain.AddMetricMeasurement(fmt.Sprintf("net_TransmittedCarrier_%s", devname), models.CreateMeasurement(uint64(devStats.TransmittedCarrier)))
+		domain.AddMetricMeasurement(fmt.Sprintf("net_TransmittedCompressed_%s", devname), models.CreateMeasurement(uint64(devStats.TransmittedCompressed)))
 
 		// Sum for totals
 		statsSum.ReceivedBytes += devStats.ReceivedBytes

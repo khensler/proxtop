@@ -200,6 +200,19 @@ func (printer *NcursesPrinter) Open() {
 	// Host collector
 	hiddenFields["host_uuid"] = true
 
+	// Network collector (domain) - verbose fields hidden by default
+	hiddenFields["net_errsRX"] = true
+	hiddenFields["net_fifoRX"] = true
+	hiddenFields["net_frameRX"] = true
+	hiddenFields["net_compRX"] = true
+	hiddenFields["net_mcastRX"] = true
+	hiddenFields["net_errsTX"] = true
+	hiddenFields["net_fifoTX"] = true
+	hiddenFields["net_collsTX"] = true
+	hiddenFields["net_carrierTX"] = true
+	hiddenFields["net_compTX"] = true
+	hiddenFields["net_interfaces"] = true // Redundant in per-interface view (DEVICE column shows this)
+
 	// Physical network verbose fields (hidden by default)
 	hiddenFields["net_RX-Fifo"] = true
 	hiddenFields["net_RX-Frame"] = true

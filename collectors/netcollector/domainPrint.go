@@ -90,7 +90,25 @@ func DomainPrintPerInterface(domain *models.Domain) map[string][]string {
 			dropTxPct = "0.00"
 		}
 
-		result[devname] = []string{mbRx, mbTx, pktRx, pktTx, dropRxPct, dropTxPct}
+		// Default values: MbRX/s, MbTX/s, PKTRX/s, PKTTX/s, %DRPRX, %DRPTX
+		row := []string{mbRx, mbTx, pktRx, pktTx, dropRxPct, dropTxPct}
+
+		// Add verbose fields when verbose mode is enabled
+		if config.Options.Verbose {
+			rxErrs := domain.GetMetricDiffUint64(fmt.Sprintf("net_ReceivedErrs_%s", devname), true)
+			rxFifo := domain.GetMetricDiffUint64(fmt.Sprintf("net_ReceivedFifo_%s", devname), true)
+			rxFrame := domain.GetMetricDiffUint64(fmt.Sprintf("net_ReceivedFrame_%s", devname), true)
+			rxComp := domain.GetMetricDiffUint64(fmt.Sprintf("net_ReceivedCompressed_%s", devname), true)
+			rxMcast := domain.GetMetricDiffUint64(fmt.Sprintf("net_ReceivedMulticast_%s", devname), true)
+			txErrs := domain.GetMetricDiffUint64(fmt.Sprintf("net_TransmittedErrs_%s", devname), true)
+			txFifo := domain.GetMetricDiffUint64(fmt.Sprintf("net_TransmittedFifo_%s", devname), true)
+			txColls := domain.GetMetricDiffUint64(fmt.Sprintf("net_TransmittedColls_%s", devname), true)
+			txCarrier := domain.GetMetricDiffUint64(fmt.Sprintf("net_TransmittedCarrier_%s", devname), true)
+			txComp := domain.GetMetricDiffUint64(fmt.Sprintf("net_TransmittedCompressed_%s", devname), true)
+			row = append(row, rxErrs, rxFifo, rxFrame, rxComp, rxMcast, txErrs, txFifo, txColls, txCarrier, txComp, devname)
+		}
+
+		result[devname] = row
 	}
 
 	return result
