@@ -401,7 +401,8 @@ Optimized for Proxmox VE environments using QMP directly.
 |-----|--------|
 | `q` / `Q` / `Ctrl+C` | Quit proxtop |
 | `h` / `H` / `?` | Toggle help overlay |
-| `f` / `F` | Toggle field selector |
+| `f` / `F` | Toggle field selector (show/hide columns, filtered by current view) |
+| `u` / `U` | Toggle human-readable units (KB/MB/GB) - status shows `[H]` |
 | `a` / `A` | Show all metrics |
 | `c` / `C` | CPU metrics only |
 | `m` / `M` | Memory metrics only |
@@ -411,7 +412,16 @@ Optimized for Proxmox VE environments using QMP directly.
 | `p` / `P` | Physical network interfaces |
 | `s` / `S` | Physical storage devices |
 | `<` / `>` | Change sort column |
+| `r` / `R` | Reverse sort direction (ascending/descending) |
 | `+` / `-` | Increase/decrease refresh interval |
+
+### Sorting
+
+- Use `<` / `>` to change which column is used for sorting
+- Use `r` to toggle between ascending (^) and descending (v) sort order
+- The sorted column header shows the direction indicator
+- Numeric columns are sorted numerically (e.g., 100 > 20, not "100" < "20")
+- Settings changes (sort, units) take effect immediately
 
 ### Field Selector
 
@@ -419,6 +429,8 @@ Press `f` to open the field selector overlay:
 - Use `↑`/`↓` or `j`/`k` to navigate
 - Press `Space` or `Enter` to toggle field visibility
 - Press `f` or `Escape` to close
+- Verbose fields are hidden by default but can be enabled here
+- Field list is filtered to the current view mode
 
 ### Screen Layout
 

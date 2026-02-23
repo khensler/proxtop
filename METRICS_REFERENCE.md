@@ -250,33 +250,35 @@ Monitors network traffic across physical and virtual interfaces.
 
 ## Disk Collector (`--disk`)
 
-Monitors block storage devices and I/O operations. Use `--storedev` to manually specify host storage devices.
+Monitors block storage devices and I/O operations. Use `--storedev` to manually specify host storage devices. This collector provides esxtop-style storage metrics.
 
 ### Host Metrics
 
-| Metric | Source | Description | Unit | Cycle |
-|--------|--------|-------------|------|-------|
-| `disk_device_reads` | /proc/diskstats | Successfully completed reads | count | 🔄 lookup |
-| `disk_device_writes` | /proc/diskstats | Successfully completed writes | count | 🔄 lookup |
-| `disk_device_ioutil` | calculated | I/O saturation level | % | 📊 collect |
+| Metric | Display Name | Source | Description | Unit | Cycle |
+|--------|--------------|--------|-------------|------|-------|
+| `disk_device_reads` | READS/s | /proc/diskstats | Read operations per second | ops/s | 📊 collect |
+| `disk_device_writes` | WRITES/s | /proc/diskstats | Write operations per second | ops/s | 📊 collect |
+| `disk_device_mbread` | MBRD/s | /proc/diskstats | MB read per second (sectors × 512) | MB/s | 📊 collect |
+| `disk_device_mbwrite` | MBWR/s | /proc/diskstats | MB written per second (sectors × 512) | MB/s | 📊 collect |
+| `disk_device_ioutil` | %UTIL | calculated | Device busy percentage (time doing I/Os) | % | 📊 collect |
+| `disk_device_currentops` | QDEPTH | /proc/diskstats | Current I/O queue depth (ops in progress) | count | 📊 collect |
+| `disk_device_queuelen` | QLEN | calculated | Average queue length (weighted time / elapsed) | count | 📊 collect |
+| `disk_device_servicetime` | SVCTM | calculated | Average service time per I/O | ms | 📊 collect |
+| `disk_device_await` | AWAIT | calculated | Average wait time per I/O (queue + service) | ms | 📊 collect |
 
 #### Verbose Mode Host Metrics 📝
 
 | Metric | Source | Description | Unit | Cycle |
 |--------|--------|-------------|------|-------|
-| `disk_device_readsmerged` | /proc/diskstats | Adjacent reads merged | count | 🔄 lookup |
-| `disk_device_sectorsread` | /proc/diskstats | Sectors read | count | 🔄 lookup |
-| `disk_device_timereading` | /proc/diskstats | Time spent reading | ms | 🔄 lookup |
-| `disk_device_writesmerged` | /proc/diskstats | Adjacent writes merged | count | 🔄 lookup |
-| `disk_device_sectorswritten` | /proc/diskstats | Sectors written | count | 🔄 lookup |
-| `disk_device_timewriting` | /proc/diskstats | Time spent writing | ms | 🔄 lookup |
-| `disk_device_currentops` | /proc/diskstats | I/Os currently in progress | count | 🔄 lookup |
-| `disk_device_timeforops` | /proc/diskstats | Total time spent on I/Os | ms | 🔄 lookup |
-| `disk_device_weightedtimeforops` | /proc/diskstats | Weighted time doing I/Os | ms | 🔄 lookup |
+| `disk_device_readsmerged` | /proc/diskstats | Adjacent reads merged | count | 📊 collect |
+| `disk_device_sectorsread` | /proc/diskstats | Sectors read | count | 📊 collect |
+| `disk_device_timereading` | /proc/diskstats | Time spent reading | ms | 📊 collect |
+| `disk_device_writesmerged` | /proc/diskstats | Adjacent writes merged | count | 📊 collect |
+| `disk_device_sectorswritten` | /proc/diskstats | Sectors written | count | 📊 collect |
+| `disk_device_timewriting` | /proc/diskstats | Time spent writing | ms | 📊 collect |
+| `disk_device_timeforops` | /proc/diskstats | Total time spent on I/Os | ms | 📊 collect |
+| `disk_device_weightedtimeforops` | /proc/diskstats | Weighted time doing I/Os | ms | 📊 collect |
 | `disk_device_count` | /proc/diskstats | Number of relevant disks | count | 🔄 lookup |
-| `disk_device_queuesize` | calculated | Number of queued I/O requests | count | 📊 collect |
-| `disk_device_queuetime` | calculated | Average queue wait time | ms | 📊 collect |
-| `disk_device_servicetime` | calculated | Average I/O service time | ms | 📊 collect |
 
 #### Internal Metrics 🔐
 
@@ -286,26 +288,30 @@ Monitors block storage devices and I/O operations. Use `--storedev` to manually 
 
 ### VM Metrics
 
-| Metric | Source | Description | Unit | Cycle |
-|--------|--------|-------------|------|-------|
-| `disk_size_capacity` | libvirt/QMP | Maximum virtual disk capacity | bytes | 🔄 lookup |
-| `disk_size_allocation` | libvirt/QMP | Currently allocated disk space | bytes | 🔄 lookup |
-| `disk_ioutil` | calculated | Estimated I/O utilization for VM | % | 📊 collect |
+| Metric | Display Name | Source | Description | Unit | Cycle |
+|--------|--------------|--------|-------------|------|-------|
+| `disk_size_capacity` | SIZE | libvirt/QMP | Maximum virtual disk capacity | bytes | 🔄 lookup |
+| `disk_size_allocation` | ALLOC | libvirt/QMP | Currently allocated disk space | bytes | 🔄 lookup |
+| `disk_ioutil` | %UTIL | calculated | Estimated I/O utilization for VM | % | 📊 collect |
+| `disk_reads` | READS/s | libvirt/QMP | Read operations per second | ops/s | 📊 collect |
+| `disk_writes` | WRITES/s | libvirt/QMP | Write operations per second | ops/s | 📊 collect |
+| `disk_mbread` | MBRD/s | libvirt/QMP | MB read per second | MB/s | 📊 collect |
+| `disk_mbwrite` | MBWR/s | libvirt/QMP | MB written per second | MB/s | 📊 collect |
+| `disk_lat_rd` | LAT/rd | libvirt/QMP | Average read latency | ms | 📊 collect |
+| `disk_lat_wr` | LAT/wr | libvirt/QMP | Average write latency | ms | 📊 collect |
+| `disk_lat_fl` | LAT/fl | libvirt/QMP | Average flush latency | ms | 📊 collect |
+| `disk_lat_avg` | LAT/avg | calculated | Average latency across all ops | ms | 📊 collect |
 
 #### Verbose Mode VM Metrics 📝
 
-| Metric | Source | Description | Unit | Cycle |
-|--------|--------|-------------|------|-------|
-| `disk_size_physical` | libvirt | Physical space for virtual disks | bytes | 🔄 lookup |
-| `disk_stats_flushreq` | libvirt | Cache flush requests | count | 🔄 lookup |
-| `disk_stats_flushtotaltimes` | libvirt | Time spent flushing cache | ns | 🔄 lookup |
-| `disk_stats_rdbytes` | libvirt | Bytes read from disk | bytes | 🔄 lookup |
-| `disk_stats_rdreq` | libvirt | Read requests | count | 🔄 lookup |
-| `disk_stats_rdtotaltimes` | libvirt | Time spent on reads | ns | 🔄 lookup |
-| `disk_stats_wrbytes` | libvirt | Bytes written to disk | bytes | 🔄 lookup |
-| `disk_stats_wrreq` | libvirt | Write requests | count | 🔄 lookup |
-| `disk_stats_wrtotaltimes` | libvirt | Time spent on writes | ns | 🔄 lookup |
-| `disk_delayblkio` | /proc/${pid}/stat | Aggregated block I/O delays | ticks | 📊 collect |
+| Metric | Display Name | Source | Description | Unit | Cycle |
+|--------|--------------|--------|-------------|------|-------|
+| `disk_size_physical` | PHYSICAL | libvirt | Physical space for virtual disks | bytes | 🔄 lookup |
+| `disk_stats_flushreq` | FLUSH/s | libvirt | Cache flush requests per second | ops/s | 📊 collect |
+| `disk_stats_rdtotaltimes` | RDTM | libvirt | Total time spent on reads | ms | 📊 collect |
+| `disk_stats_wrtotaltimes` | WRTM | libvirt | Total time spent on writes | ms | 📊 collect |
+| `disk_stats_flushtotaltimes` | FLTM | libvirt | Total time spent on flushes | ms | 📊 collect |
+| `disk_delayblkio` | BLKIO | /proc/${pid}/stat | Aggregated block I/O delays | ticks | 📊 collect |
 
 #### Internal Metrics 🔐
 
@@ -461,11 +467,25 @@ disk_device_servicetime = Δweightedtimeforops / (Δreads + Δreadsmerged + Δwr
 
 1. **Collection Cycles**: Metrics marked with "lookup" are collected during VM discovery (less frequently), while "collect" metrics are gathered every sampling interval.
 
-2. **Verbose Mode**: Enable with `--verbose` to collect additional detailed metrics at the cost of slightly higher overhead.
+2. **Verbose Fields**: In the ncurses UI, verbose-only fields are hidden by default but can be enabled via the field selector (press `f`). In CLI mode, use `--verbose` to enable all additional metrics.
 
-3. **Root Requirements**: Some metrics (I/O collector, host UUID) require root privileges to access protected proc filesystem entries.
+3. **Human-Readable Mode**: Enable with `-H` command-line flag or press `u` in the ncurses UI to format byte values as KB/MB/GB/TB. When active, the status bar displays `[H]`. Changes take effect immediately.
 
-4. **Proxmox vs Libvirt**: On Proxmox VE, QMP (QEMU Machine Protocol) is used instead of libvirt API for faster metric collection.
+4. **Root Requirements**: Some metrics (I/O collector, host UUID) require root privileges to access protected proc filesystem entries.
 
-5. **Rate Metrics**: Most counter-based metrics (bytes, packets, etc.) should be interpreted as rates when comparing across time intervals.
+5. **Proxmox vs Libvirt**: On Proxmox VE, QMP (QEMU Machine Protocol) is used instead of libvirt API for faster metric collection.
+
+6. **Rate Metrics**: Most counter-based metrics (bytes, packets, etc.) should be interpreted as rates when comparing across time intervals.
+
+7. **esxtop Equivalent Metrics**: proxtop provides many esxtop-equivalent metrics for VMware-to-KVM/Proxmox migrations:
+   - `%UTIL` = Device busy percentage (like esxtop GAVG/DAVG context)
+   - `QDEPTH` = Current queue depth (like esxtop ACTV)
+   - `QLEN` = Average queue length (like esxtop QUED)
+   - `SVCTM` = Service time (like esxtop DAVG)
+   - `AWAIT` = Wait time (like esxtop KAVG)
+   - `LAT/rd`, `LAT/wr`, `LAT/fl` = Per-operation type latencies
+
+8. **Sorting**: Use `<`/`>` to change sort column, `r` to toggle ascending/descending. The sorted column shows `^` (ascending) or `v` (descending). Numeric columns are sorted numerically.
+
+9. **Physical Device Views**: Press `p` for physical network interfaces or `s` for physical disk devices. These views use the same field selector as VM views - press `f` to show/hide columns.
 

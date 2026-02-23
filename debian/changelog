@@ -1,3 +1,24 @@
+proxtop (1.1.2-1) stable; urgency=medium
+
+  * Added sort direction toggle ('r' keybind) - ascending/descending
+  * Added sort direction indicators (^/v) in column headers
+  * Fixed numeric sorting in physical device views
+  * Converted physical views to use standard field system
+  * Physical view fields now work with field selector
+  * Added immediate refresh on settings toggle (no delay)
+  * Verbose fields now hidden by default in field selector
+
+proxtop (1.1.1-1) stable; urgency=medium
+
+  * Fixed ncurses column overflow with dynamic width calculation
+  * Fixed memory unit inconsistency (KB vs bytes)
+  * Added human-readable units toggle (-H flag, 'u' keybind)
+  * Added physical disk metrics: QDEPTH, QLEN, SVCTM, AWAIT, MB/s
+  * Added VM disk latency metrics: LAT/rd, LAT/wr, LAT/fl
+  * Enhanced esxtop-equivalent metrics coverage
+  * Improved field selector filtering per view mode
+  * Updated documentation with new metrics and usage
+
 proxtop (1.1.0-1) stable; urgency=medium
 
   * Added GitHub Actions workflow for automated .deb builds

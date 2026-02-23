@@ -48,17 +48,18 @@ func InitializePrinter(wg *sync.WaitGroup) {
 			// If collection is paused (overlay shown), use short intervals for responsive UI
 			// Otherwise, sleep until the next scheduled time
 			for {
-				if CollectionPaused {
+				if ForceRefresh {
+					// Settings changed - refresh immediately
+					ForceRefresh = false
+					Print()
+					break
+				} else if CollectionPaused {
 					// Overlay shown - redraw frequently for responsive UI
 					time.Sleep(100 * time.Millisecond)
 					Print()
 				} else if time.Now().Before(nextDataRun) {
-					// Normal mode - sleep until next data run
-					sleepDuration := nextDataRun.Sub(time.Now())
-					if sleepDuration > 0 {
-						time.Sleep(sleepDuration)
-					}
-					break
+					// Normal mode - sleep in short intervals to check for ForceRefresh
+					time.Sleep(50 * time.Millisecond)
 				} else {
 					break
 				}

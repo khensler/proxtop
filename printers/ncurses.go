@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/cha87de/goncurses"
@@ -13,7 +14,6 @@ import (
 	"proxtop/config"
 	"proxtop/models"
 	"proxtop/runners"
-	"proxtop/util"
 )
 
 var screen *goncurses.Window
@@ -42,8 +42,8 @@ type NcursesPrinter struct {
 }
 
 const HOSTWINHEIGHT = 5
-const DOMAINMINFIELDWIDTH = 8   // Minimum column width
-const DOMAINMAXFIELDWIDTH = 14  // Maximum column width to prevent overflow
+const DOMAINMINFIELDWIDTH = 6  // Minimum column width
+const DOMAINMAXFIELDWIDTH = 10 // Maximum column width to prevent overflow
 const HOSTFIELDWIDTH = 10       // Width for host field names
 const HOSTVALUEWIDTH = 12       // Width for host values
 
@@ -53,8 +53,9 @@ type KeyValue struct {
 }
 
 var domainColumnWidths []int
-var currentViewMode ViewMode = ViewAll
+var currentViewMode ViewMode = ViewCPU
 var currentSortColumn int = 3
+var sortAscending bool = false // false = descending (default), true = ascending
 var showHelpOverlay bool = false
 var helpDrawn bool = false
 var quitRequested bool = false
@@ -81,8 +82,133 @@ func (printer *NcursesPrinter) Open() {
 	screen.Keypad(true)        // enable keypad for special keys
 	screen.Timeout(100)        // non-blocking input with 100ms timeout
 
-	// Initialize field selection state
+	// Always enable verbose mode so all fields are collected
+	// Users can show/hide individual fields via the field selector ('f' key)
+	config.Options.Verbose = true
+
+	// Initialize field selection state with verbose-only fields hidden by default
 	hiddenFields = make(map[string]bool)
+
+	// Verbose-only fields (hidden by default, can be enabled via field selector)
+	// CPU collector
+	hiddenFields["cpu_%othrdy"] = true
+	hiddenFields["cpu_minfreq"] = true
+	hiddenFields["cpu_maxfreq"] = true
+	hiddenFields["cpu_%nice"] = true
+	hiddenFields["cpu_%irq"] = true
+	hiddenFields["cpu_%softirq"] = true
+	hiddenFields["cpu_%guest"] = true
+	hiddenFields["cpu_%guestnice"] = true
+
+	// Memory collector (domain)
+	hiddenFields["mem_MAXSZ"] = true
+	hiddenFields["mem_VSIZE"] = true
+	hiddenFields["mem_SWAPIN"] = true
+	hiddenFields["mem_SWAPOUT"] = true
+	hiddenFields["mem_CMINFLT"] = true
+	hiddenFields["mem_CMAJFLT"] = true
+
+	// Memory collector (host) - detailed breakdown fields
+	hiddenFields["mem_buffers"] = true
+	hiddenFields["mem_cached"] = true
+	hiddenFields["mem_swapcached"] = true
+	hiddenFields["mem_active"] = true
+	hiddenFields["mem_inactive"] = true
+	hiddenFields["mem_activeanon"] = true
+	hiddenFields["mem_inactiveanon"] = true
+	hiddenFields["mem_activefile"] = true
+	hiddenFields["mem_inactivefile"] = true
+	hiddenFields["mem_unevictable"] = true
+	hiddenFields["mem_mlocked"] = true
+	hiddenFields["mem_dirty"] = true
+	hiddenFields["mem_writeback"] = true
+	hiddenFields["mem_anonpages"] = true
+	hiddenFields["mem_mapped"] = true
+	hiddenFields["mem_shmem"] = true
+	hiddenFields["mem_kreclaimable"] = true
+	hiddenFields["mem_slab"] = true
+	hiddenFields["mem_sreclaimable"] = true
+	hiddenFields["mem_sunreclaim"] = true
+	hiddenFields["mem_kernelstack"] = true
+	hiddenFields["mem_pagetables"] = true
+	hiddenFields["mem_nfs_unstable"] = true
+	hiddenFields["mem_bounce"] = true
+	hiddenFields["mem_writebacktmp"] = true
+	hiddenFields["mem_commitlimit"] = true
+	hiddenFields["mem_committed_as"] = true
+	hiddenFields["mem_vmalloctotal"] = true
+	hiddenFields["mem_vmallocused"] = true
+	hiddenFields["mem_vmallocchunk"] = true
+	hiddenFields["mem_percpu"] = true
+	hiddenFields["mem_hardwarecorrupted"] = true
+	hiddenFields["mem_anonhugepages"] = true
+	hiddenFields["mem_shmemhugepages"] = true
+	hiddenFields["mem_shmempmdmapped"] = true
+	hiddenFields["mem_cmatotal"] = true
+	hiddenFields["mem_cmafree"] = true
+	hiddenFields["mem_hugepages_total"] = true
+	hiddenFields["mem_hugepages_free"] = true
+	hiddenFields["mem_hugepages_rsvd"] = true
+	hiddenFields["mem_hugepages_surp"] = true
+	hiddenFields["mem_hugepagesize"] = true
+	hiddenFields["mem_hugetlb"] = true
+	hiddenFields["mem_directmap4k"] = true
+	hiddenFields["mem_directmap2m"] = true
+	hiddenFields["mem_directmap1g"] = true
+
+	// Disk collector (domain)
+	hiddenFields["dsk_PHYSICAL"] = true
+	hiddenFields["dsk_FLUSH/s"] = true
+	hiddenFields["dsk_RDTM"] = true
+	hiddenFields["dsk_WRTM"] = true
+	hiddenFields["dsk_FLTM"] = true
+	hiddenFields["dsk_BLKIO"] = true
+
+	// Disk collector (host)
+	hiddenFields["dsk_rdmerged"] = true
+	hiddenFields["dsk_sectorsrd"] = true
+	hiddenFields["dsk_timerd"] = true
+	hiddenFields["dsk_wrmerged"] = true
+	hiddenFields["dsk_sectorswr"] = true
+	hiddenFields["dsk_timewr"] = true
+	hiddenFields["dsk_timeforops"] = true
+	hiddenFields["dsk_weightedtime"] = true
+	hiddenFields["dsk_count"] = true
+
+	// I/O collector
+	hiddenFields["io_rchar"] = true
+	hiddenFields["io_wchar"] = true
+	hiddenFields["io_cancelled"] = true
+
+	// PSI collector (all PSI fields are verbose-only)
+	hiddenFields["psi_some_cpu_avg10"] = true
+	hiddenFields["psi_some_cpu_avg300"] = true
+	hiddenFields["psi_some_cpu_total"] = true
+	hiddenFields["psi_some_io_avg10"] = true
+	hiddenFields["psi_some_io_avg300"] = true
+	hiddenFields["psi_some_io_total"] = true
+	hiddenFields["psi_full_io_avg10"] = true
+	hiddenFields["psi_full_io_avg300"] = true
+	hiddenFields["psi_full_io_total"] = true
+	hiddenFields["psi_some_mem_avg10"] = true
+	hiddenFields["psi_some_mem_avg300"] = true
+	hiddenFields["psi_some_mem_total"] = true
+	hiddenFields["psi_full_mem_avg10"] = true
+	hiddenFields["psi_full_mem_avg300"] = true
+	hiddenFields["psi_full_mem_total"] = true
+
+	// Host collector
+	hiddenFields["host_uuid"] = true
+
+	// Physical network verbose fields (hidden by default)
+	hiddenFields["net_RX-Fifo"] = true
+	hiddenFields["net_RX-Frame"] = true
+	hiddenFields["net_RX-Compressed"] = true
+	hiddenFields["net_RX-Multicast"] = true
+	hiddenFields["net_TX-Fifo"] = true
+	hiddenFields["net_TX-Colls"] = true
+	hiddenFields["net_TX-Carrier"] = true
+	hiddenFields["net_TX-Compressed"] = true
 }
 
 // handleInput processes keyboard input and returns true if we should quit
@@ -172,6 +298,9 @@ func handleInput() bool {
 		}
 	case '>':
 		currentSortColumn++
+	case 'r', 'R': // Toggle sort direction (reverse)
+		sortAscending = !sortAscending
+		runners.ForceRefresh = true
 	case '+', '=': // Increase refresh interval
 		if config.Options.Frequency < 60 {
 			config.Options.Frequency++
@@ -182,6 +311,7 @@ func handleInput() bool {
 		}
 	case 'u', 'U': // Toggle human-readable units
 		config.Options.HumanReadable = !config.Options.HumanReadable
+		runners.ForceRefresh = true
 	}
 	return false
 }
@@ -210,22 +340,6 @@ func getViewModeName() string {
 
 // filterFieldsByView filters fields and values based on current view mode and hidden fields
 func filterFieldsByView(fields []string, values map[string][]string) ([]string, map[string][]string) {
-	var prefix string
-	switch currentViewMode {
-	case ViewCPU:
-		prefix = "cpu_"
-	case ViewMem:
-		prefix = "mem_"
-	case ViewDisk:
-		prefix = "dsk_"
-	case ViewNet:
-		prefix = "net_"
-	case ViewIO:
-		prefix = "io_"
-	default:
-		prefix = "" // ViewAll - no prefix filtering
-	}
-
 	// Always include UUID and name (first two columns)
 	filteredFields := []string{}
 	includeIndices := []int{}
@@ -236,8 +350,29 @@ func filterFieldsByView(fields []string, values map[string][]string) ([]string, 
 			continue
 		}
 
-		// Filter by prefix (or include all if no prefix)
-		if i < 2 || prefix == "" || strings.HasPrefix(strings.ToLower(field), prefix) {
+		// Check if field matches current view mode
+		include := false
+		if i < 2 {
+			include = true // Always include UUID and name
+		} else {
+			fieldLower := strings.ToLower(field)
+			switch currentViewMode {
+			case ViewCPU:
+				include = strings.HasPrefix(fieldLower, "cpu_")
+			case ViewMem:
+				include = strings.HasPrefix(fieldLower, "mem_")
+			case ViewDisk:
+				include = strings.HasPrefix(fieldLower, "dsk_")
+			case ViewNet:
+				include = strings.HasPrefix(fieldLower, "net_")
+			case ViewIO:
+				include = strings.HasPrefix(fieldLower, "io_") || strings.HasPrefix(fieldLower, "psi_")
+			default:
+				include = true // ViewAll - include all fields
+			}
+		}
+
+		if include {
 			filteredFields = append(filteredFields, field)
 			includeIndices = append(includeIndices, i)
 		}
@@ -336,12 +471,12 @@ func (printer *NcursesPrinter) Screen(printable models.Printable) {
 	if actualInterval < 0.1 {
 		actualInterval = float64(config.Options.Frequency) // First run, use target
 	}
-	unitsIndicator := ""
+	modeIndicators := ""
 	if config.Options.HumanReadable {
-		unitsIndicator = " [H]"
+		modeIndicators += " [H]"
 	}
-	statusLine := fmt.Sprintf(" proxtop | View: %s%s | Refresh: %.1fs (+/-) | 'h' help, 'u' units, 'q' quit ",
-		getViewModeName(), unitsIndicator, actualInterval)
+	statusLine := fmt.Sprintf(" proxtop | View: %s%s | Refresh: %.1fs (+/-) | 'h' help, 'u' units, 'f' fields, 'q' quit ",
+		getViewModeName(), modeIndicators, actualInterval)
 	for len(statusLine) < maxx {
 		statusLine += " "
 	}
@@ -519,27 +654,27 @@ func filterHostFieldsByView(fields []string, values []string) ([]string, []strin
 		return fields, values
 	}
 
-	var prefix string
-	switch currentViewMode {
-	case ViewCPU:
-		prefix = "cpu_"
-	case ViewMem:
-		prefix = "mem_"
-	case ViewDisk:
-		prefix = "dsk_"
-	case ViewNet:
-		prefix = "net_"
-	case ViewIO:
-		prefix = "io_"
-	default:
-		return fields, values
-	}
-
 	filteredFields := []string{}
 	filteredValues := []string{}
 
 	for i, field := range fields {
-		if strings.HasPrefix(strings.ToLower(field), prefix) {
+		fieldLower := strings.ToLower(field)
+		include := false
+		switch currentViewMode {
+		case ViewCPU:
+			include = strings.HasPrefix(fieldLower, "cpu_")
+		case ViewMem:
+			include = strings.HasPrefix(fieldLower, "mem_")
+		case ViewDisk:
+			include = strings.HasPrefix(fieldLower, "dsk_")
+		case ViewNet:
+			include = strings.HasPrefix(fieldLower, "net_")
+		case ViewIO:
+			include = strings.HasPrefix(fieldLower, "io_") || strings.HasPrefix(fieldLower, "psi_")
+		default:
+			include = true
+		}
+		if include {
 			filteredFields = append(filteredFields, field)
 			if i < len(values) {
 				filteredValues = append(filteredValues, values[i])
@@ -554,7 +689,7 @@ func filterHostFieldsByView(fields []string, values []string) ([]string, []strin
 func printHelpOverlay(maxy, maxx int) {
 	// Center the help box
 	helpWidth := 50
-	helpHeight := 28
+	helpHeight := 29
 	startY := (maxy - helpHeight) / 2
 	startX := (maxx - helpWidth) / 2
 
@@ -574,7 +709,7 @@ func printHelpOverlay(maxy, maxx int) {
 		screen.Printf("proxtop - Keybindings (press 'h' to close)")
 		screen.AttrOff(goncurses.A_BOLD)
 		screen.Move(3, 2)
-		screen.Printf("a/c/m/d/n/i - View modes | u - Units | q - Quit")
+		screen.Printf("a/c/m/d/n/i - Views | u - Units | f - Fields | q - Quit")
 		screen.Refresh()
 		return
 	}
@@ -611,23 +746,25 @@ func printHelpOverlay(maxy, maxx int) {
 	helpWin.Printf("< - Sort by previous column")
 	helpWin.Move(15, 4)
 	helpWin.Printf("> - Sort by next column")
+	helpWin.Move(16, 4)
+	helpWin.Printf("r - Reverse sort direction (asc/desc)")
 
-	helpWin.Move(17, 2)
+	helpWin.Move(18, 2)
 	helpWin.Printf("Display:")
-	helpWin.Move(18, 4)
-	helpWin.Printf("u - Toggle human-readable units (KB/MB/GB)")
 	helpWin.Move(19, 4)
-	helpWin.Printf("+ - Increase refresh interval (slower)")
+	helpWin.Printf("u - Toggle human-readable units (KB/MB/GB)")
 	helpWin.Move(20, 4)
+	helpWin.Printf("+ - Increase refresh interval (slower)")
+	helpWin.Move(21, 4)
 	helpWin.Printf("- - Decrease refresh interval (faster)")
 
-	helpWin.Move(22, 2)
+	helpWin.Move(23, 2)
 	helpWin.Printf("Other:")
-	helpWin.Move(23, 4)
-	helpWin.Printf("f - Field selector (show/hide columns)")
 	helpWin.Move(24, 4)
-	helpWin.Printf("h/? - Toggle this help")
+	helpWin.Printf("f - Field selector (show/hide columns)")
 	helpWin.Move(25, 4)
+	helpWin.Printf("h/? - Toggle this help")
+	helpWin.Move(26, 4)
 	helpWin.Printf("q   - Quit (also Ctrl+C)")
 
 	helpWin.NoutRefresh()
@@ -737,8 +874,31 @@ func printFieldSelectorOverlay(maxy, maxx int, domainFields []string) {
 // filterFieldsForSelector returns the list of fields for the current view mode
 func filterFieldsForSelector(domainFields []string) []string {
 	var filtered []string
+
+	// For physical views, use fields from the collector directly
+	switch currentViewMode {
+	case ViewPhysNet:
+		// Get fields from network collector (skip first "DEVICE" column)
+		physFields := netcollector.HostNetFields()
+		for i, field := range physFields {
+			if i > 0 { // Skip DEVICE column - always visible
+				filtered = append(filtered, field)
+			}
+		}
+		return filtered
+	case ViewPhysDisk:
+		// Get fields from disk collector (skip first "DEVICE" column)
+		physFields := diskcollector.HostDiskFields()
+		for i, field := range physFields {
+			if i > 0 { // Skip DEVICE column - always visible
+				filtered = append(filtered, field)
+			}
+		}
+		return filtered
+	}
+
+	// For other views, filter domain fields
 	for _, field := range domainFields {
-		// Filter by view mode prefix
 		switch currentViewMode {
 		case ViewCPU:
 			if strings.HasPrefix(field, "cpu_") {
@@ -851,33 +1011,94 @@ func printHost(window *goncurses.Window, fields []string, values []string) {
 }
 
 func printDomain(window *goncurses.Window, fields []string, values map[string][]string, sortByColumn int) {
-	// Reset column widths for this view
-	domainColumnWidths = make([]int, len(fields))
+	// Get terminal width
+	_, maxx := window.MaxYX()
+	availableWidth := maxx - 2 // Leave margin
 
-	// Calculate optimal column widths based on field names
+	// Reset column widths for this view
+	numColumns := len(fields)
+	if numColumns == 0 {
+		return
+	}
+	domainColumnWidths = make([]int, numColumns)
+	desiredWidths := make([]int, numColumns) // Track what each column ideally wants
+
+	// First pass: calculate desired widths for each column based on data
 	for colID, field := range fields {
 		fieldParts := strings.Split(field, "_")
 		fieldName := fieldParts[len(fieldParts)-1]
-		// Start with field name length, but ensure minimum width
-		domainColumnWidths[colID] = len(fieldName)
-		if domainColumnWidths[colID] < DOMAINMINFIELDWIDTH {
-			domainColumnWidths[colID] = DOMAINMINFIELDWIDTH
+		// Start with field name length
+		desiredWidths[colID] = len(fieldName)
+		if desiredWidths[colID] < DOMAINMINFIELDWIDTH {
+			desiredWidths[colID] = DOMAINMINFIELDWIDTH
 		}
 	}
 
-	// Expand columns based on data widths, but cap at max
+	// Check max data width for each column (no cap - we want actual desired size)
 	for _, vals := range values {
 		for colID, val := range vals {
-			if colID < len(domainColumnWidths) {
-				dataLen := len(val)
-				if dataLen > domainColumnWidths[colID] {
-					// Expand column up to max width
-					if dataLen <= DOMAINMAXFIELDWIDTH {
-						domainColumnWidths[colID] = dataLen
-					} else {
-						domainColumnWidths[colID] = DOMAINMAXFIELDWIDTH
-					}
+			if colID < numColumns && len(val) > desiredWidths[colID] {
+				desiredWidths[colID] = len(val)
+			}
+		}
+	}
+
+	// Calculate total desired width
+	totalDesired := 0
+	for _, w := range desiredWidths {
+		totalDesired += w + 1 // +1 for separator
+	}
+
+	// If everything fits, use desired widths directly
+	if totalDesired <= availableWidth {
+		for colID := range domainColumnWidths {
+			domainColumnWidths[colID] = desiredWidths[colID]
+		}
+	} else {
+		// Not enough space - need to compress columns
+		// Start with minimum widths
+		for colID := range domainColumnWidths {
+			domainColumnWidths[colID] = DOMAINMINFIELDWIDTH
+		}
+
+		// Calculate total width used (including 1 char separator per column)
+		calcTotalWidth := func() int {
+			total := 0
+			for _, w := range domainColumnWidths {
+				total += w + 1
+			}
+			return total
+		}
+
+		// Cap desired widths at DOMAINMAXFIELDWIDTH for constrained distribution
+		cappedDesired := make([]int, numColumns)
+		for colID := range desiredWidths {
+			cappedDesired[colID] = desiredWidths[colID]
+			if cappedDesired[colID] > DOMAINMAXFIELDWIDTH {
+				cappedDesired[colID] = DOMAINMAXFIELDWIDTH
+			}
+		}
+
+		// Distribute remaining space to columns that need it (up to capped max)
+		for iteration := 0; iteration < 100; iteration++ {
+			totalUsed := calcTotalWidth()
+			remaining := availableWidth - totalUsed
+
+			if remaining <= 0 {
+				break
+			}
+
+			expanded := false
+			for colID := range domainColumnWidths {
+				if domainColumnWidths[colID] < cappedDesired[colID] && remaining > 0 {
+					domainColumnWidths[colID]++
+					remaining--
+					expanded = true
 				}
+			}
+
+			if !expanded {
+				break
 			}
 		}
 	}
@@ -914,6 +1135,14 @@ func printDomain(window *goncurses.Window, fields []string, values map[string][]
 	for colID, field := range fields {
 		fieldParts := strings.Split(field, "_")
 		fieldName := fieldParts[len(fieldParts)-1]
+		// Add sort direction indicator to sorted column
+		if sortByColumn == colID {
+			if sortAscending {
+				fieldName = fieldName + "^"
+			} else {
+				fieldName = fieldName + "v"
+			}
+		}
 		fieldLabel := padRight(fieldName, domainColumnWidths[colID])
 
 		if sortByColumn == colID {
@@ -957,18 +1186,47 @@ func printDomain(window *goncurses.Window, fields []string, values map[string][]
 func sortDomainIDsByField(values map[string][]string, sortByColumn int) []KeyValue {
 	var sorted []KeyValue
 	for key, value := range values {
-		if len(value) >= sortByColumn {
+		if len(value) > sortByColumn {
 			sorted = append(sorted, KeyValue{key, value[sortByColumn]})
 		}
 	}
 	sort.Slice(sorted, func(i, j int) bool {
+		// Try numeric comparison first
+		vi, errI := strconv.ParseFloat(sorted[i].Value, 64)
+		vj, errJ := strconv.ParseFloat(sorted[j].Value, 64)
+		if errI == nil && errJ == nil {
+			// Both are numeric
+			if sortAscending {
+				return vi < vj
+			}
+			return vi > vj
+		}
+		// Fall back to string comparison
+		if sortAscending {
+			return sorted[i].Value < sorted[j].Value
+		}
 		return sorted[i].Value > sorted[j].Value
 	})
 	return sorted
 }
 
 func prepareForCell(content string, columnID int) string {
-	return expandCell(fitInCell(content), columnID)
+	return expandCell(fitInCellWithWidth(content, columnID), columnID)
+}
+
+func fitInCellWithWidth(content string, columnID int) string {
+	maxWidth := DOMAINMAXFIELDWIDTH
+	if columnID < len(domainColumnWidths) {
+		maxWidth = domainColumnWidths[columnID]
+	}
+	if len(content) > maxWidth {
+		// Truncate with "..." to indicate overflow
+		if maxWidth > 3 {
+			return content[:maxWidth-3] + "..."
+		}
+		return content[:maxWidth]
+	}
+	return content
 }
 
 func fitInCell(content string) string {
@@ -995,8 +1253,13 @@ func expandCell(content string, columnID int) string {
 		}
 		content = content + strings.Join(spaces, "")
 	} else if len(content) > domainColumnWidths[columnID] {
-		// column width is smaller, store larger width
-		domainColumnWidths[columnID] = len(content)
+		// Truncate to column width
+		width := domainColumnWidths[columnID]
+		if width > 3 {
+			content = content[:width-3] + "..."
+		} else {
+			content = content[:width]
+		}
 	}
 	return content
 }
@@ -1020,61 +1283,96 @@ func padRight(s string, width int) string {
 func printPhysicalNetDevices(window *goncurses.Window) {
 	maxy, maxx := window.MaxYX()
 
-	// Get physical network devices
-	devices := util.GetPhysicalNetDevices()
+	// Get fields and data from collector
+	allFields := netcollector.HostNetFields()
+	allDeviceData := netcollector.HostPrintPerDevice()
 
-	// Column headers
-	headers := []string{"INTERFACE", "RX-Bytes", "RX-Pkts", "RX-Errs", "RX-Drop", "TX-Bytes", "TX-Pkts", "TX-Errs", "TX-Drop"}
-	widths := []int{15, 12, 12, 12, 12, 12, 12, 10, 10}
+	// Filter fields based on hiddenFields (but always keep DEVICE column)
+	visibleFields := []string{}
+	visibleIndices := []int{}
+	for i, field := range allFields {
+		if i == 0 || !hiddenFields[field] {
+			visibleFields = append(visibleFields, field)
+			visibleIndices = append(visibleIndices, i)
+		}
+	}
 
-	// Build sortable list
+	// Build data rows with only visible columns
 	type netDevRow struct {
 		name   string
-		values []uint64
+		values []string
 	}
-	rows := make([]netDevRow, 0, len(devices))
-	for name, dev := range devices {
-		rows = append(rows, netDevRow{
-			name: name,
-			values: []uint64{
-				dev.ReceivedBytes, dev.ReceivedPackets, dev.ReceivedErrs, dev.ReceivedDrop,
-				dev.TransmittedBytes, dev.TransmittedPackets, dev.TransmittedErrs, dev.TransmittedDrop,
-			},
-		})
+	rows := make([]netDevRow, 0, len(allDeviceData))
+	for name, vals := range allDeviceData {
+		visibleVals := make([]string, len(visibleIndices))
+		for vi, origIdx := range visibleIndices {
+			if origIdx < len(vals) {
+				visibleVals[vi] = vals[origIdx]
+			}
+		}
+		rows = append(rows, netDevRow{name: name, values: visibleVals})
 	}
 
-	// Sort by selected column (0=name, 1-8=numeric columns)
+	// Sort by selected column
 	sortCol := currentSortColumn
-	if sortCol >= len(headers) {
+	if sortCol >= len(visibleFields) {
 		sortCol = 0
 	}
 	sort.Slice(rows, func(i, j int) bool {
 		if sortCol == 0 {
-			return rows[i].name < rows[j].name
+			// Sort by name alphabetically
+			if sortAscending {
+				return rows[i].name < rows[j].name
+			}
+			return rows[i].name > rows[j].name
 		}
-		return rows[i].values[sortCol-1] > rows[j].values[sortCol-1] // descending for numeric
+		// Parse as float for numeric comparison
+		vi, _ := strconv.ParseFloat(rows[i].values[sortCol], 64)
+		vj, _ := strconv.ParseFloat(rows[j].values[sortCol], 64)
+		if sortAscending {
+			return vi < vj
+		}
+		return vi > vj
 	})
+
+	// Calculate column widths dynamically (add space for sort indicator)
+	widths := make([]int, len(visibleFields))
+	for i, field := range visibleFields {
+		fieldName := strings.TrimPrefix(field, "net_")
+		widths[i] = len(fieldName) + 1 // +1 for sort indicator
+		if widths[i] < 8 {
+			widths[i] = 8
+		}
+	}
+	for _, r := range rows {
+		for i, v := range r.values {
+			if i < len(widths) && len(v) > widths[i] {
+				widths[i] = len(v)
+			}
+		}
+	}
 
 	// Print header with sort indicator
 	window.Move(0, 0)
-	col := 0
-	for i, h := range headers {
+	for i, field := range visibleFields {
+		fieldName := strings.TrimPrefix(field, "net_")
+		// Add sort direction indicator
 		if i == sortCol {
+			if sortAscending {
+				fieldName = fieldName + "^"
+			} else {
+				fieldName = fieldName + "v"
+			}
 			window.AttrOn(goncurses.A_BOLD | goncurses.A_REVERSE)
 		} else {
 			window.AttrOn(goncurses.A_BOLD)
 		}
-		format := fmt.Sprintf("%%-%ds", widths[i])
-		if i > 0 {
-			format = fmt.Sprintf("%%%ds", widths[i])
+		format := fmt.Sprintf("%%%ds ", widths[i])
+		if i == 0 {
+			format = fmt.Sprintf("%%-%ds ", widths[i])
 		}
-		window.Printf(format+" ", h)
-		if i == sortCol {
-			window.AttrOff(goncurses.A_BOLD | goncurses.A_REVERSE)
-		} else {
-			window.AttrOff(goncurses.A_BOLD)
-		}
-		col += widths[i] + 1
+		window.Printf(format, fieldName)
+		window.AttrOff(goncurses.A_BOLD | goncurses.A_REVERSE)
 	}
 
 	// Print rows
@@ -1084,10 +1382,17 @@ func printPhysicalNetDevices(window *goncurses.Window) {
 			break
 		}
 		window.Move(row, 0)
-		line := fmt.Sprintf("%-15s %12d %12d %12d %12d %12d %12d %10d %10d",
-			r.name,
-			r.values[0], r.values[1], r.values[2], r.values[3],
-			r.values[4], r.values[5], r.values[6], r.values[7])
+		line := ""
+		for i, v := range r.values {
+			if i >= len(widths) {
+				break
+			}
+			if i == 0 {
+				line += fmt.Sprintf("%-*s ", widths[i], v)
+			} else {
+				line += fmt.Sprintf("%*s ", widths[i], v)
+			}
+		}
 		if len(line) > maxx {
 			line = line[:maxx]
 		}
@@ -1102,70 +1407,96 @@ func printPhysicalNetDevices(window *goncurses.Window) {
 func printPhysicalDiskDevices(window *goncurses.Window) {
 	maxy, maxx := window.MaxYX()
 
-	// Get disk stats from /proc/diskstats
-	devices := util.GetProcDiskstats()
+	// Get fields and data from collector
+	allFields := diskcollector.HostDiskFields()
+	allDeviceData := diskcollector.HostPrintPerDevice()
 
-	// Column headers
-	headers := []string{"DEVICE", "READS", "RD-MRGD", "SECT-RD", "WRITES", "WR-MRGD", "SECT-WR", "IO-OPS", "IO-TIME"}
-	widths := []int{12, 10, 10, 12, 10, 10, 12, 8, 10}
+	// Filter fields based on hiddenFields (but always keep DEVICE column)
+	visibleFields := []string{}
+	visibleIndices := []int{}
+	for i, field := range allFields {
+		if i == 0 || !hiddenFields[field] {
+			visibleFields = append(visibleFields, field)
+			visibleIndices = append(visibleIndices, i)
+		}
+	}
 
-	// Build sortable list (filtering as we go)
+	// Build data rows with only visible columns
 	type diskDevRow struct {
 		name   string
-		values []uint64
+		values []string
 	}
-	rows := make([]diskDevRow, 0)
-	for name, dev := range devices {
-		// Filter out partitions (only show base devices) and loop/ram devices
-		if strings.HasPrefix(name, "loop") || strings.HasPrefix(name, "ram") {
-			continue
+	rows := make([]diskDevRow, 0, len(allDeviceData))
+	for name, vals := range allDeviceData {
+		visibleVals := make([]string, len(visibleIndices))
+		for vi, origIdx := range visibleIndices {
+			if origIdx < len(vals) {
+				visibleVals[vi] = vals[origIdx]
+			}
 		}
-		// Skip dm- devices
-		if strings.HasPrefix(name, "dm-") {
-			continue
-		}
-		rows = append(rows, diskDevRow{
-			name: name,
-			values: []uint64{
-				dev.Reads, dev.ReadsMerged, dev.SectorsRead,
-				dev.Writes, dev.WritesMerged, dev.SectorsWritten,
-				dev.CurrentOps, dev.TimeForOps,
-			},
-		})
+		rows = append(rows, diskDevRow{name: name, values: visibleVals})
 	}
 
-	// Sort by selected column (0=name, 1-8=numeric columns)
+	// Sort by selected column
 	sortCol := currentSortColumn
-	if sortCol >= len(headers) {
+	if sortCol >= len(visibleFields) {
 		sortCol = 0
 	}
 	sort.Slice(rows, func(i, j int) bool {
 		if sortCol == 0 {
-			return rows[i].name < rows[j].name
+			// Sort by name alphabetically
+			if sortAscending {
+				return rows[i].name < rows[j].name
+			}
+			return rows[i].name > rows[j].name
 		}
-		return rows[i].values[sortCol-1] > rows[j].values[sortCol-1] // descending for numeric
+		// Parse as float for numeric comparison
+		vi, _ := strconv.ParseFloat(rows[i].values[sortCol], 64)
+		vj, _ := strconv.ParseFloat(rows[j].values[sortCol], 64)
+		if sortAscending {
+			return vi < vj
+		}
+		return vi > vj
 	})
+
+	// Calculate column widths dynamically (add space for sort indicator)
+	widths := make([]int, len(visibleFields))
+	for i, field := range visibleFields {
+		fieldName := strings.TrimPrefix(field, "dsk_")
+		widths[i] = len(fieldName) + 1 // +1 for sort indicator
+		if widths[i] < 8 {
+			widths[i] = 8
+		}
+	}
+	for _, r := range rows {
+		for i, v := range r.values {
+			if i < len(widths) && len(v) > widths[i] {
+				widths[i] = len(v)
+			}
+		}
+	}
 
 	// Print header with sort indicator
 	window.Move(0, 0)
-	col := 0
-	for i, h := range headers {
+	for i, field := range visibleFields {
+		fieldName := strings.TrimPrefix(field, "dsk_")
+		// Add sort direction indicator
 		if i == sortCol {
+			if sortAscending {
+				fieldName = fieldName + "^"
+			} else {
+				fieldName = fieldName + "v"
+			}
 			window.AttrOn(goncurses.A_BOLD | goncurses.A_REVERSE)
 		} else {
 			window.AttrOn(goncurses.A_BOLD)
 		}
-		format := fmt.Sprintf("%%-%ds", widths[i])
-		if i > 0 {
-			format = fmt.Sprintf("%%%ds", widths[i])
+		format := fmt.Sprintf("%%%ds ", widths[i])
+		if i == 0 {
+			format = fmt.Sprintf("%%-%ds ", widths[i])
 		}
-		window.Printf(format+" ", h)
-		if i == sortCol {
-			window.AttrOff(goncurses.A_BOLD | goncurses.A_REVERSE)
-		} else {
-			window.AttrOff(goncurses.A_BOLD)
-		}
-		col += widths[i] + 1
+		window.Printf(format, fieldName)
+		window.AttrOff(goncurses.A_BOLD | goncurses.A_REVERSE)
 	}
 
 	// Print rows
@@ -1175,10 +1506,17 @@ func printPhysicalDiskDevices(window *goncurses.Window) {
 			break
 		}
 		window.Move(row, 0)
-		line := fmt.Sprintf("%-12s %10d %10d %12d %10d %10d %12d %8d %10d",
-			r.name,
-			r.values[0], r.values[1], r.values[2], r.values[3],
-			r.values[4], r.values[5], r.values[6], r.values[7])
+		line := ""
+		for i, v := range r.values {
+			if i >= len(widths) {
+				break
+			}
+			if i == 0 {
+				line += fmt.Sprintf("%-*s ", widths[i], v)
+			} else {
+				line += fmt.Sprintf("%*s ", widths[i], v)
+			}
+		}
 		if len(line) > maxx {
 			line = line[:maxx]
 		}

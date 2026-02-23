@@ -111,47 +111,80 @@ func diskHostLookup(host *models.Host) {
 }
 
 func diskHostCollect(host *models.Host) {
-	// util: total time during which I/Os were in progress, divided by the
-	// sampling interval
+	// %UTIL: total time during which I/Os were in progress, divided by the
+	// sampling interval (device busy percentage)
 	ioutil := diffInMilliseconds(host, "disk_device_timeforops", true)
 
-	// queueSize: weighted number of milliseconds spent doing I/Os divided by
-	// the milliseconds elapsed
-	queuesize := diffInMilliseconds(host, "disk_device_weightedtimeforops", false)
+	// QLEN (queue length/size): weighted number of milliseconds spent doing I/Os divided by
+	// the milliseconds elapsed - represents average queue length
+	queuelen := diffInMilliseconds(host, "disk_device_weightedtimeforops", false)
 
-	queuetime, servicetime := getTimes(host)
+	// Calculate AWAIT (average wait time) and SVCTM (average service time)
+	await, servicetime := getTimes(host)
+
+	// Calculate MB/s for reads and writes
+	mbReadPerSec, mbWritePerSec := getMBPerSec(host)
 
 	host.AddMetricMeasurement("disk_device_ioutil", models.CreateMeasurement(ioutil))
-	host.AddMetricMeasurement("disk_device_queuesize", models.CreateMeasurement(queuesize))
-	host.AddMetricMeasurement("disk_device_queuetime", models.CreateMeasurement(queuetime))
+	host.AddMetricMeasurement("disk_device_queuelen", models.CreateMeasurement(queuelen))
+	host.AddMetricMeasurement("disk_device_await", models.CreateMeasurement(await))
 	host.AddMetricMeasurement("disk_device_servicetime", models.CreateMeasurement(servicetime))
+	host.AddMetricMeasurement("disk_device_mbread", models.CreateMeasurement(mbReadPerSec))
+	host.AddMetricMeasurement("disk_device_mbwrite", models.CreateMeasurement(mbWritePerSec))
+}
+
+// getMBPerSec calculates MB/s for reads and writes
+func getMBPerSec(host *models.Host) (string, string) {
+	// Sectors are 512 bytes each
+	sectorsRead := host.GetMetricDiffUint64AsFloat("disk_device_sectorsread", true)
+	sectorsWritten := host.GetMetricDiffUint64AsFloat("disk_device_sectorswritten", true)
+
+	mbRead := (sectorsRead * 512) / (1024 * 1024)
+	mbWrite := (sectorsWritten * 512) / (1024 * 1024)
+
+	return fmt.Sprintf("%.2f", mbRead), fmt.Sprintf("%.2f", mbWrite)
 }
 
 func diskPrintHost(host *models.Host) []string {
+	// I/O rates
 	diskDeviceReads := host.GetMetricDiffUint64("disk_device_reads", true)
-	diskDeviceReadsmerged := host.GetMetricDiffUint64("disk_device_readsmerged", true)
-	diskDeviceSectorsread := host.GetMetricDiffUint64("disk_device_sectorsread", true)
-	diskDeviceTimereading := host.GetMetricDiffUint64("disk_device_timereading", true)
 	diskDeviceWrites := host.GetMetricDiffUint64("disk_device_writes", true)
-	diskDeviceWritesmerged := host.GetMetricDiffUint64("disk_device_writesmerged", true)
-	diskDeviceSectorswritten := host.GetMetricDiffUint64("disk_device_sectorswritten", true)
-	diskDeviceTimewriting := host.GetMetricDiffUint64("disk_device_timewriting", true)
-	diskDeviceCurrentops := host.GetMetricDiffUint64("disk_device_currentops", true)
-	diskDeviceTimeforops := host.GetMetricDiffUint64("disk_device_timeforops", true)
-	diskDeviceWeightedtimeforops := host.GetMetricDiffUint64("disk_device_weightedtimeforops", true)
-	diskDeviceCountStr, _ := host.GetMetricUint64("disk_device_count", 0)
-	//diskDeviceCount, _ := strconv.Atoi(diskDeviceCountStr)
 
+	// Throughput (MB/s)
+	mbRead := host.GetMetricString("disk_device_mbread", 0)
+	mbWrite := host.GetMetricString("disk_device_mbwrite", 0)
+
+	// Device busy percentage
 	ioutil := host.GetMetricString("disk_device_ioutil", 0)
-	queuesize := host.GetMetricString("disk_device_queuesize", 0)
-	queuetime := host.GetMetricString("disk_device_queuetime", 0)
-	servicetime := host.GetMetricString("disk_device_servicetime", 0)
 
-	result := append([]string{diskDeviceReads}, diskDeviceWrites, ioutil)
+	// Queue depth (current I/Os in progress) - instantaneous value
+	qdepthRaw, _ := host.GetMetricUint64("disk_device_currentops", 0)
+
+	// Queue length (average queue size)
+	queuelen := host.GetMetricString("disk_device_queuelen", 0)
+
+	// Service time and wait time (latency metrics)
+	servicetime := host.GetMetricString("disk_device_servicetime", 0)
+	await := host.GetMetricString("disk_device_await", 0)
+
+	// Default: READS/s, WRITES/s, MBRD/s, MBWR/s, %UTIL, QDEPTH, QLEN, SVCTM, AWAIT
+	result := []string{diskDeviceReads, diskDeviceWrites, mbRead, mbWrite, ioutil, qdepthRaw, queuelen, servicetime, await}
+
 	if config.Options.Verbose {
+		// Additional detailed stats for verbose mode
+		diskDeviceReadsmerged := host.GetMetricDiffUint64("disk_device_readsmerged", true)
+		diskDeviceSectorsread := host.GetMetricDiffUint64("disk_device_sectorsread", true)
+		diskDeviceTimereading := host.GetMetricDiffUint64("disk_device_timereading", true)
+		diskDeviceWritesmerged := host.GetMetricDiffUint64("disk_device_writesmerged", true)
+		diskDeviceSectorswritten := host.GetMetricDiffUint64("disk_device_sectorswritten", true)
+		diskDeviceTimewriting := host.GetMetricDiffUint64("disk_device_timewriting", true)
+		diskDeviceTimeforops := host.GetMetricDiffUint64("disk_device_timeforops", true)
+		diskDeviceWeightedtimeforops := host.GetMetricDiffUint64("disk_device_weightedtimeforops", true)
+		diskDeviceCountStr, _ := host.GetMetricUint64("disk_device_count", 0)
+
 		result = append(result, diskDeviceReadsmerged, diskDeviceSectorsread, diskDeviceTimereading)
-		result = append(result, diskDeviceWritesmerged, diskDeviceSectorswritten, diskDeviceTimewriting, diskDeviceCurrentops, diskDeviceTimeforops)
-		result = append(result, diskDeviceWeightedtimeforops, diskDeviceCountStr, queuesize, queuetime, servicetime)
+		result = append(result, diskDeviceWritesmerged, diskDeviceSectorswritten, diskDeviceTimewriting)
+		result = append(result, diskDeviceTimeforops, diskDeviceWeightedtimeforops, diskDeviceCountStr)
 	}
 
 	return result
@@ -265,4 +298,89 @@ func clearDuplicateDevices(diskstats map[string]util.ProcDiskstat) map[string]ut
 	}
 	return result
 
+}
+
+// HostDiskFields returns the field names for host physical disk view
+func HostDiskFields() []string {
+	fields := []string{
+		"dsk_DEVICE",
+		"dsk_READS/s",
+		"dsk_WRITES/s",
+		"dsk_MBRD/s",
+		"dsk_MBWR/s",
+		"dsk_%UTIL",
+		"dsk_QDEPTH",
+		"dsk_SVCTM",
+		"dsk_AWAIT",
+	}
+	if config.Options.Verbose {
+		fields = append(fields,
+			"dsk_rdmerged",
+			"dsk_sectorsrd",
+			"dsk_timerd",
+			"dsk_wrmerged",
+			"dsk_sectorswr",
+			"dsk_timewr",
+			"dsk_timeforops",
+			"dsk_weightedtime",
+		)
+	}
+	return fields
+}
+
+// HostPrintPerDevice returns per-device disk stats for physical disk view
+// Returns a map of device name -> []string (field values in same order as HostDiskFields)
+func HostPrintPerDevice() map[string][]string {
+	diskstats := util.GetProcDiskstats()
+	result := make(map[string][]string)
+
+	// Filter out loop, ram, dm- devices
+	for name, dev := range diskstats {
+		if strings.HasPrefix(name, "loop") || strings.HasPrefix(name, "ram") || strings.HasPrefix(name, "dm-") {
+			continue
+		}
+
+		// Calculate per-second rates (approximation - we don't have previous values here)
+		// For now, show raw counters; proper rates would require storing previous values
+		reads := fmt.Sprintf("%d", dev.Reads)
+		writes := fmt.Sprintf("%d", dev.Writes)
+		mbRead := fmt.Sprintf("%.2f", float64(dev.SectorsRead)*512/1024/1024)
+		mbWrite := fmt.Sprintf("%.2f", float64(dev.SectorsWritten)*512/1024/1024)
+
+		// %UTIL approximation (time for ops / total time * 100) - need interval for accuracy
+		util := fmt.Sprintf("%d", dev.TimeForOps)
+
+		// Queue depth (current ops in flight)
+		qDepth := fmt.Sprintf("%d", dev.CurrentOps)
+
+		// Service time (ms per op)
+		totalOps := dev.Reads + dev.Writes
+		var svcTm, await string
+		if totalOps > 0 {
+			svcTm = fmt.Sprintf("%.2f", float64(dev.TimeForOps)/float64(totalOps))
+			await = fmt.Sprintf("%.2f", float64(dev.WeightedTimeForOps)/float64(totalOps))
+		} else {
+			svcTm = "0.00"
+			await = "0.00"
+		}
+
+		values := []string{name, reads, writes, mbRead, mbWrite, util, qDepth, svcTm, await}
+
+		if config.Options.Verbose {
+			values = append(values,
+				fmt.Sprintf("%d", dev.ReadsMerged),
+				fmt.Sprintf("%d", dev.SectorsRead),
+				fmt.Sprintf("%d", dev.TimeReading),
+				fmt.Sprintf("%d", dev.WritesMerged),
+				fmt.Sprintf("%d", dev.SectorsWritten),
+				fmt.Sprintf("%d", dev.TimeWriting),
+				fmt.Sprintf("%d", dev.TimeForOps),
+				fmt.Sprintf("%d", dev.WeightedTimeForOps),
+			)
+		}
+
+		result[name] = values
+	}
+
+	return result
 }

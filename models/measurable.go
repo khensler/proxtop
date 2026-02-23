@@ -138,6 +138,24 @@ func (measurable *Measurable) GetMetricUint64(metricName string, measurementInde
 	return output, nil
 }
 
+// GetMetricUint64Raw returns the given metric value at measurement index as uint64
+func (measurable *Measurable) GetMetricUint64Raw(metricName string, measurementIndex int) (uint64, error) {
+	var output uint64
+	if metric, ok := measurable.GetMetric(metricName); ok {
+		if len(metric.Values) > measurementIndex {
+			byteValue := metric.Values[measurementIndex].Value
+			reader := bytes.NewReader(byteValue)
+			decoder := gob.NewDecoder(reader)
+			decoder.Decode(&output)
+		} else {
+			return 0, fmt.Errorf("metric %s has no index %d", metricName, measurementIndex)
+		}
+	} else {
+		return 0, fmt.Errorf("metric %s not found", metricName)
+	}
+	return output, nil
+}
+
 // GetMetricFloat64 computes the diff as Float64 between the two measurements for given metric and returns it as string
 func (measurable *Measurable) GetMetricFloat64(metricName string, measurementIndex int) string {
 	var output string

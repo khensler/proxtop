@@ -14,17 +14,25 @@ Rules-Requires-Root: no
 Package: proxtop
 Architecture: amd64
 Depends: ${shlibs:Depends}, ${misc:Depends}, libvirt0, libncurses5 | libncurses6
-Description: VM monitoring tool for KVM and Proxmox VE hypervisors
- proxtop (formerly kvmtop) monitors virtual machine resource utilization
- from the hypervisor level, measuring the real resource consumption
- including overhead.
+Description: Real-time VM monitoring for KVM and Proxmox VE - esxtop for Linux
+ proxtop is a real-time VM monitoring tool for KVM and Proxmox VE hypervisors.
+ Think of it as esxtop for Linux virtualization.
+ .
+ proxtop reads resource utilization metrics from the hypervisor level (not
+ inside the guest), giving you visibility into what VMs actually consume
+ including virtualization overhead. This is essential for troubleshooting
+ performance issues and detecting noisy neighbor problems.
  .
  Features:
-  - Hypervisor-level metrics from /proc, libvirt, and QMP
-  - CPU steal time and overhead detection
-  - Noisy neighbor identification
-  - Multiple output formats: ncurses, text, JSON
-  - TCP streaming to monitoring systems
+  - CPU: steal time, ready time, per-vCPU utilization
+  - Memory: RSS, balloon, page faults, swap activity
+  - Disk: IOPS, throughput, latency (read/write/flush), queue depth
+  - Network: bytes/packets, per-device breakdown
+  - Interactive ncurses UI with field selector and multiple view modes
+  - Verbose mode toggle for additional detailed metrics
+  - Human-readable units (KB/MB/GB) toggle
+  - Text and JSON output for scripting
+  - TCP streaming to InfluxDB, Prometheus, Logstash
   - Auto-detection of KVM and Proxmox VE environments
  .
  This package contains the proxtop monitoring tool and proxprofiler

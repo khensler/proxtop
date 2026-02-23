@@ -10,6 +10,10 @@ var initialLookupDone chan bool
 // This allows the UI to remain responsive during help/field selection
 var CollectionPaused bool = false
 
+// ForceRefresh is set to true to trigger an immediate screen refresh
+// Used when settings change (e.g., human-readable toggle)
+var ForceRefresh bool = false
+
 // InitializeRunners starts necessary runners as threads
 func InitializeRunners() {
 	var wg sync.WaitGroup

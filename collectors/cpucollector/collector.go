@@ -71,6 +71,8 @@ func (collector *Collector) Print() models.Printable {
 		)
 	}
 	// Domain fields - esxtop style: %USED (cpu time), %RDY (queue/steal time)
+	// %sys = CPU time used by other threads (I/O, emulation) - like %SYS in esxtop
+	// %othrdy = queue/wait time for other threads
 	domainFields := []string{
 		"cpu_cores",
 		"cpu_%used",
@@ -79,7 +81,6 @@ func (collector *Collector) Print() models.Printable {
 	}
 	if config.Options.Verbose {
 		domainFields = append(domainFields,
-			"cpu_%other",
 			"cpu_%othrdy",
 		)
 	}

@@ -1,8 +1,25 @@
 ## What proxtop does
 
-proxtop reads utilisation metrics about virtual machines running on a KVM or Proxmox VE hypervisor from the Linux proc filesystem, libvirt, and QMP (QEMU Machine Protocol).
+**proxtop** is a real-time VM monitoring tool for KVM and Proxmox VE hypervisors. It reads resource utilization metrics from the Linux proc filesystem, libvirt, and QMP (QEMU Machine Protocol) to give you visibility into what your virtual machines are actually consuming from the hypervisor's perspective.
 
 **Think of it as `esxtop` for KVM and Proxmox VE.**
+
+### Why use proxtop?
+
+- **Hypervisor-level visibility**: See what VMs are actually consuming, not just what they report internally
+- **Detect CPU steal time**: Identify when VMs are waiting for CPU due to overprovisioning
+- **Find noisy neighbors**: Discover which VMs are causing resource contention
+- **Monitor storage latency**: Track disk IOPS, throughput, queue depth, and latency per-VM
+- **Real-time troubleshooting**: Interactive ncurses UI with multiple view modes and sorting
+- **Integration-ready**: Stream JSON metrics to InfluxDB, Prometheus, or any monitoring system via TCP
+
+### When to use proxtop
+
+- **Performance troubleshooting**: A VM is slow - is it CPU steal? Memory pressure? Disk latency?
+- **Capacity planning**: Are your hosts overprovisioned? Which VMs are heaviest?
+- **VMware migration**: Moving from ESXi to Proxmox? proxtop gives you the same visibility as esxtop
+- **Noisy neighbor detection**: Which VM is consuming all the disk I/O or network bandwidth?
+- **SLA monitoring**: Stream metrics to your monitoring stack for alerting and dashboards
 
 ### proxtop vs esxtop
 
@@ -10,21 +27,25 @@ proxtop reads utilisation metrics about virtual machines running on a KVM or Pro
 |---------|-----------------|----------------------|
 | Hypervisor | ESXi | KVM, Proxmox VE |
 | Metrics source | VMkernel | /proc, libvirt, QMP |
-| CPU steal/ready time | ✅ %RDY, %CSTP | ✅ cpu_steal |
-| Memory overhead | ✅ MCTLSZ, SWCUR | ✅ ram_rss, page faults |
-| Disk latency | ✅ GAVG, DAVG | ✅ ioutil, queue time |
-| Network stats | ✅ MbRX/TX | ✅ bytes/packets |
-| Interactive UI | ✅ ncurses | ✅ ncurses |
-| Batch/script mode | ✅ CSV export | ✅ text, JSON, TCP |
+| CPU steal/ready time | ✅ %RDY, %CSTP | ✅ cpu_steal, %rdy |
+| Memory overhead | ✅ MCTLSZ, SWCUR | ✅ RSS, MCTL, page faults |
+| Disk latency | ✅ GAVG, DAVG, KAVG | ✅ LAT/rd, LAT/wr, AWAIT, SVCTM |
+| Disk queue metrics | ✅ ACTV, QUED | ✅ QDEPTH, QLEN, %UTIL |
+| Network stats | ✅ MbRX/TX | ✅ bytes/packets, Mb/s |
+| Interactive UI | ✅ ncurses | ✅ ncurses with field selector |
+| Batch/script mode | ✅ CSV export | ✅ text, JSON output |
 | Streaming to TSDB | ❌ requires vROps | ✅ built-in TCP to Logstash/InfluxDB |
+| Human-readable units | ✅ | ✅ press 'u' or use -H flag |
+| Sort direction toggle | ✅ | ✅ press 'r' for asc/desc |
+| Physical device views | ✅ | ✅ press 'p' (net) or 's' (disk) |
 
 If you're migrating from VMware to Proxmox or KVM, proxtop provides the same hypervisor-level visibility you're used to with esxtop.
 
-### Why hypervisor-level monitoring?
+### How it works
 
-proxtop (formerly kvmtop) takes into account the difference between utilisation inside and outside the virtual machine, which differs in cases of overprovisioning. proxtop collects utilisation values of the hypervisor for virtual machines, to measure the overhead needed to run a virtual machine. proxtop will help to identify resource shortcomings, leading to the "noisy neighbour" effect.
+proxtop (formerly kvmtop) measures resource utilization from outside the VM at the hypervisor level. This captures the real resource consumption including virtualization overhead - the difference between what VMs think they're using vs. what they actually consume.
 
-proxtop supports both standard libvirt-based KVM hypervisors and Proxmox VE, with auto-detection of the hypervisor type.
+proxtop auto-detects whether you're running standard libvirt-based KVM or Proxmox VE and uses the appropriate connector (libvirt API or QMP sockets).
 
 The conceptual idea behind proxtop is scientifically published and described in "Reviewing Cloud Monitoring: Towards Cloud Resource Profiling."
 

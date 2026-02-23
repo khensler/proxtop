@@ -15,7 +15,7 @@ import (
 	"proxtop/runners"
 )
 
-var version = "devbuild"
+var version = "1.1.2-1"
 
 func main() {
 

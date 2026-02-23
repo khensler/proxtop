@@ -7,24 +7,36 @@ import (
 	"proxtop/util"
 )
 
-// formatMemValue formats a memory value, optionally in human-readable format
-func formatMemValue(value string) string {
+// formatMemKB formats a memory value in KB, converting to bytes for human-readable format
+func formatMemKB(valueKB uint64) string {
 	if config.Options.HumanReadable {
-		return util.FormatBytesFromString(value)
+		// Convert KB to bytes for formatting
+		return util.FormatBytes(valueKB * 1024)
 	}
-	return value
+	return fmt.Sprintf("%d", valueKB)
+}
+
+// formatMemBytes formats a memory value in bytes
+func formatMemBytes(valueBytes uint64) string {
+	if config.Options.HumanReadable {
+		return util.FormatBytes(valueBytes)
+	}
+	return fmt.Sprintf("%d", valueBytes)
 }
 
 func domainPrint(domain *models.Domain) []string {
 	// esxtop style: MEMSZ (configured memory), GRANT (used), RSS (resident)
-	total, _ := domain.GetMetricUint64("ram_total", 0)
-	used, _ := domain.GetMetricUint64("ram_used", 0)
-	freeMem, _ := domain.GetMetricUint64("ram_free", 0)
-	maxMem, _ := domain.GetMetricUint64("ram_max", 0)
-	actualMem, _ := domain.GetMetricUint64("ram_actual", 0)
+	// Note: total, used, free, max, actual are in KB (from Proxmox/libvirt)
+	// rss and vsize are in bytes (from /proc/[pid]/stat)
+	totalKB, _ := domain.GetMetricUint64Raw("ram_total", 0)
+	usedKB, _ := domain.GetMetricUint64Raw("ram_used", 0)
+	freeMemKB, _ := domain.GetMetricUint64Raw("ram_free", 0)
+	maxMemKB, _ := domain.GetMetricUint64Raw("ram_max", 0)
+	actualMemKB, _ := domain.GetMetricUint64Raw("ram_actual", 0)
 
-	vsize, _ := domain.GetMetricUint64("ram_vsize", 0)
-	rss, _ := domain.GetMetricUint64("ram_rss", 0)
+	// These are in bytes
+	vsizeBytes, _ := domain.GetMetricUint64Raw("ram_vsize", 0)
+	rssBytes, _ := domain.GetMetricUint64Raw("ram_rss", 0)
 
 	// Active percentage (stored as float64, returned as formatted string)
 	activePctStr := domain.GetMetricFloat64("ram_activepct", 0)
@@ -48,18 +60,18 @@ func domainPrint(domain *models.Domain) []string {
 	majflt := domain.GetMetricDiffUint64("ram_majflt", false)
 	cmajflt := domain.GetMetricDiffUint64("ram_cmajflt", false)
 
-	// Format memory values (human-readable if enabled)
-	totalFmt := formatMemValue(total)
-	usedFmt := formatMemValue(used)
-	freeMemFmt := formatMemValue(freeMem)
-	rssFmt := formatMemValue(rss)
-	actualMemFmt := formatMemValue(actualMem)
+	// Format memory values with correct units
+	totalFmt := formatMemKB(totalKB)
+	usedFmt := formatMemKB(usedKB)
+	freeMemFmt := formatMemKB(freeMemKB)
+	rssFmt := formatMemBytes(rssBytes)
+	actualMemFmt := formatMemKB(actualMemKB)
 
 	// Default fields: MEMSZ, GRANT, FREE, %ACTV, RSS, MCTL, MINFLT, MAJFLT
 	result := append([]string{totalFmt}, usedFmt, freeMemFmt, activePct, rssFmt, actualMemFmt, minflt, majflt)
 	if config.Options.Verbose {
-		maxMemFmt := formatMemValue(maxMem)
-		vsizeFmt := formatMemValue(vsize)
+		maxMemFmt := formatMemKB(maxMemKB)
+		vsizeFmt := formatMemBytes(vsizeBytes)
 		result = append(result, maxMemFmt, vsizeFmt, swapIn, swapOut, cminflt, cmajflt)
 	}
 

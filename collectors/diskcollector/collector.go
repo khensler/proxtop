@@ -64,11 +64,22 @@ func (collector *Collector) Collect() {
 
 // Print returns the collectors measurements in a Printable struct
 func (collector *Collector) Print() models.Printable {
-	// Host fields - esxtop style
+	// Host fields - esxtop style with key storage metrics
+	// %UTIL = device busy percentage (time spent doing I/Os)
+	// QDEPTH = current I/O queue depth
+	// QLEN = average queue length
+	// SVCTM = average service time per I/O (ms)
+	// AWAIT = average wait time per I/O (ms)
 	hostFields := []string{
 		"dsk_READS/s",
 		"dsk_WRITES/s",
+		"dsk_MBRD/s",
+		"dsk_MBWR/s",
 		"dsk_%UTIL",
+		"dsk_QDEPTH",
+		"dsk_QLEN",
+		"dsk_SVCTM",
+		"dsk_AWAIT",
 	}
 	// Domain fields - esxtop style with latency breakout
 	// LAT/rd, LAT/wr, LAT/fl = average latency for read/write/flush operations (ms)
@@ -94,13 +105,9 @@ func (collector *Collector) Print() models.Printable {
 			"dsk_wrmerged",
 			"dsk_sectorswr",
 			"dsk_timewr",
-			"dsk_currentops",
 			"dsk_timeforops",
 			"dsk_weightedtime",
 			"dsk_count",
-			"dsk_queuesize",
-			"dsk_queuetime",
-			"dsk_servicetime",
 		)
 		// Verbose adds: physical size, flush ops/s, and total time breakdown (rd/wr/flush in ms)
 		domainFields = append(domainFields,
