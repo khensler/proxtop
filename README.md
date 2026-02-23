@@ -1,11 +1,28 @@
 ## What proxtop does
+
 proxtop reads utilisation metrics about virtual machines running on a KVM or Proxmox VE hypervisor from the Linux proc filesystem, libvirt, and QMP (QEMU Machine Protocol).
 
-*Why yet another monitoring tool for virtual machines?*
+**Think of it as `esxtop` for KVM and Proxmox VE.**
 
-proxtop (formerly kvmtop) takes into account the difference between utilisation inside and
-outside the virtual machine, which differs in cases of overprovisioning. proxtop collects utilisation values of the hypervisor for virtual machines, to measure the overhead needed to run a virtual machine. proxtop will help to identify resource shortcomings, leading
-to the "noisy neighbour" effect.
+### proxtop vs esxtop
+
+| Feature | esxtop (VMware) | proxtop (KVM/Proxmox) |
+|---------|-----------------|----------------------|
+| Hypervisor | ESXi | KVM, Proxmox VE |
+| Metrics source | VMkernel | /proc, libvirt, QMP |
+| CPU steal/ready time | ✅ %RDY, %CSTP | ✅ cpu_steal |
+| Memory overhead | ✅ MCTLSZ, SWCUR | ✅ ram_rss, page faults |
+| Disk latency | ✅ GAVG, DAVG | ✅ ioutil, queue time |
+| Network stats | ✅ MbRX/TX | ✅ bytes/packets |
+| Interactive UI | ✅ ncurses | ✅ ncurses |
+| Batch/script mode | ✅ CSV export | ✅ text, JSON, TCP |
+| Streaming to TSDB | ❌ requires vROps | ✅ built-in TCP to Logstash/InfluxDB |
+
+If you're migrating from VMware to Proxmox or KVM, proxtop provides the same hypervisor-level visibility you're used to with esxtop.
+
+### Why hypervisor-level monitoring?
+
+proxtop (formerly kvmtop) takes into account the difference between utilisation inside and outside the virtual machine, which differs in cases of overprovisioning. proxtop collects utilisation values of the hypervisor for virtual machines, to measure the overhead needed to run a virtual machine. proxtop will help to identify resource shortcomings, leading to the "noisy neighbour" effect.
 
 proxtop supports both standard libvirt-based KVM hypervisors and Proxmox VE, with auto-detection of the hypervisor type.
 
