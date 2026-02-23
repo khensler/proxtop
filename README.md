@@ -155,7 +155,7 @@ proxtop --cpu --printer=json --output=tcp --target=127.0.0.1:12345
 | Disk Collector | --disk | Disk stats (host and VMs) like capacity, utilisation, reads/writes, etc. |
 | Network Collector | --net | Network stats (host and VMs) like transmitted and received bytes, packets, errors, etc. |
 | I/O Collector | --io | Disk I/O stats (host and VMs) like reads/writes |
-| PSI Collector | --psi | Pressure Stall Information (PSI) values (host only) |
+| PSI Collector | --pressure | Pressure Stall Information (PSI) values (host only, requires kernel 4.20+) |
 | Host | --host | Host details (host only) |
 
 ## proxtop with InfluxDB

@@ -320,10 +320,18 @@ Default output mode with a live-updating terminal interface.
 
 Tab-separated output suitable for processing with `awk`, `cut`, etc.
 
+Output includes:
+- **Host fields header** (if host-level metrics are enabled)
+- **Domain fields header**
+- **Host values** (one row per collection cycle)
+- **Domain values** (one row per VM per collection cycle)
+
 ```
-UUID    name    cpu_cores    cpu_total    cpu_steal
-abc123  vm1     2            45           2
-def456  vm2     4            78           5
+psi_some_cpu_avg60    psi_some_io_avg60    psi_full_io_avg60
+UUID    name    cpu_cores    cpu_%used
+0.000000    0.000000    0.000000
+abc123  vm1     2            45
+def456  vm2     4            78
 ```
 
 ### JSON

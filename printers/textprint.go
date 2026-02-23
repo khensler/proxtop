@@ -22,9 +22,19 @@ func (printer *TextPrinter) Open() {
 func (printer *TextPrinter) Screen(printable models.Printable) {
 	fields := printable.DomainFields
 	values := printable.DomainValues
+	hostFields := printable.HostFields
+	hostValues := printable.HostValues
 
 	if showheader {
-		// iterate over fields
+		// Print host fields header if present
+		if len(hostFields) > 0 {
+			for _, field := range hostFields {
+				Output(fmt.Sprintf("%s\t", field))
+			}
+			Output(fmt.Sprint("\n"))
+		}
+
+		// Print domain fields header
 		for _, field := range fields {
 			Output(fmt.Sprintf("%s\t", field))
 		}
@@ -32,6 +42,14 @@ func (printer *TextPrinter) Screen(printable models.Printable) {
 
 		// deactivate header
 		showheader = false
+	}
+
+	// Print host values if present
+	if len(hostValues) > 0 {
+		for _, value := range hostValues {
+			Output(fmt.Sprintf("%s\t", value))
+		}
+		Output(fmt.Sprint("\n"))
 	}
 
 	// iterate over domains

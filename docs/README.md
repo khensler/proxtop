@@ -336,17 +336,18 @@ current host where kvmtop is running on.
 
 ## PSI Collector
 
-Enable with parameter `--psi.
+Enable with parameter `--pressure`.
 
 The PSI Collector extends the metrics by providing the Pressure Stall
 Information (PSI) data from the host. These values indicate a resource
 shortcoming in advance, before it actually occurs, for CPU, IO and memory.
-Pressure Stall Information (PSI) controller works only with kernel 4.20 and
-higher.
+Pressure Stall Information (PSI) requires kernel 4.20 or higher.
+
+**Note:** PSI metrics are host-level only. They are displayed in the host panel in ncurses mode, and as a separate row in text/JSON output.
 
 cf. https://facebookmicrosites.github.io/psi/docs/overview#pressure-metric-definitions
 
-### Host Host Metrics
+### Host Metrics
 
 | Metric              | Source             | Description                                                                                     | Cycle   |
 |---------------------|--------------------|-------------------------------------------------------------------------------------------------|---------|
@@ -372,8 +373,6 @@ cf. https://facebookmicrosites.github.io/psi/docs/overview#pressure-metric-defin
 | psi_full_mem_avg300 | /proc/pressure/mem | Ratio (percent) of time all tasks were delayed due to lack of memory within 300 seconds         | collect |
 | psi_full_mem_total  | /proc/pressure/mem | Total absolute delay time for all tasks (in microseconds) for memory                            | collect |
 
-### Host Virtual Machine Metrics
+### VM Metrics
 
-| Metric               | Source | Description | Cycle |
-|----------------------|--------|-------------|-------|
-| no metrics available |        |             |       |
+PSI data is host-level only. No per-VM PSI metrics are available.
