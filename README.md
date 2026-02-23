@@ -38,7 +38,23 @@ For detailed information, see the following documentation:
 
 ## Installation
 
-Build from source using Go:
+### Download Pre-built Packages
+
+Download the latest `.deb` package for Proxmox/Debian from the [Releases](../../releases) page.
+
+```bash
+# Install on Proxmox/Debian
+dpkg -i proxtop_*.deb
+
+# Configure target server
+nano /etc/proxtop.conf
+
+# Enable and start service
+systemctl enable proxtop
+systemctl start proxtop
+```
+
+### Build from Source
 
 ```bash
 go build -o proxtop ./cmd/proxtop
