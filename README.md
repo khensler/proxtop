@@ -26,6 +26,16 @@ The conceptual idea behind proxtop is scientifically published and described in 
 
 The command line tool can be used by sysadmins, using a console ui (ncurses). Text or JSON output further allows to process the monitoring data. A built-in TCP output allows to send the data directly to a monitoring data sink, e.g. logstash.
 
+## Documentation
+
+For detailed information, see the following documentation:
+
+| Document | Description |
+|----------|-------------|
+| [DOCUMENTATION.md](DOCUMENTATION.md) | Comprehensive guide covering installation, configuration, collectors, output formats, deployment, and troubleshooting |
+| [METRICS_REFERENCE.md](METRICS_REFERENCE.md) | Complete reference of all collected metrics with sources, descriptions, and calculation formulas |
+| [docs/README.md](docs/README.md) | Technical metric collector documentation |
+
 ## Installation
 
 Build from source using Go:
