@@ -1,8 +1,8 @@
 package iocollector
 
 import (
-	"kvmtop/config"
-	"kvmtop/models"
+	"proxtop/config"
+	"proxtop/models"
 )
 
 // Collector describes the io collector
@@ -34,17 +34,18 @@ func (collector *Collector) Collect() {
 
 // Print returns the collectors measurements in a Printable struct
 func (collector *Collector) Print() models.Printable {
+	// Domain fields - esxtop style: MBRD/s, MBWR/s, IOPS (syscalls)
 	domainFields := []string{
-		"io_read_bytes",
-		"io_write_bytes",
+		"io_MBRD/s",
+		"io_MBWR/s",
+		"io_RDOPS",
+		"io_WROPS",
 	}
 	if config.Options.Verbose {
 		domainFields = append(domainFields,
 			"io_rchar",
 			"io_wchar",
-			"io_syscr",
-			"io_syscw",
-			"io_cancelled_write_bytes",
+			"io_cancelled",
 		)
 	}
 	printable := models.Printable{

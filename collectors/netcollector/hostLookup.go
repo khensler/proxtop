@@ -3,10 +3,10 @@ package netcollector
 import (
 	"fmt"
 
-	"kvmtop/config"
-	"kvmtop/connector"
-	"kvmtop/models"
-	"kvmtop/util"
+	"proxtop/config"
+	"proxtop/connector"
+	"proxtop/models"
+	"proxtop/util"
 	libvirt "github.com/libvirt/libvirt-go"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 )

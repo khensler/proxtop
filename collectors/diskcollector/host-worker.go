@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"strings"
 
-	"kvmtop/config"
-	"kvmtop/util"
+	"proxtop/config"
+	"proxtop/util"
 
-	"kvmtop/models"
+	"proxtop/models"
 )
 
 func diskHostLookup(host *models.Host) {

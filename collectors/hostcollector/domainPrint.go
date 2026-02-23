@@ -1,7 +1,7 @@
 package hostcollector
 
 import (
-	"kvmtop/models"
+	"proxtop/models"
 )
 
 func domainPrint(domain *models.Domain) []string {

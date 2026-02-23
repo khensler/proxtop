@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"kvmtop/config"
+	"proxtop/config"
 )
 
 // ProcStatCPU describes one CPU row in /proc/stat

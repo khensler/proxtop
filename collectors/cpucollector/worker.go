@@ -8,9 +8,10 @@ import (
 
 	"fmt"
 
-	"kvmtop/config"
-	"kvmtop/models"
-	"kvmtop/util"
+	"proxtop/config"
+	"proxtop/connector"
+	"proxtop/models"
+	"proxtop/util"
 	libvirt "github.com/libvirt/libvirt-go"
 )
 
@@ -102,18 +103,19 @@ func cpuCollectMeasurements(domain *models.Domain, metricName string, measuremen
 func cpuPrint(domain *models.Domain) []string {
 	cores, _ := domain.GetMetricUint64("cpu_cores", 0)
 
-	// cpu util for vcores
+	// cpu util for vcores (%USED in esxtop terms)
 	cputimeAllCores := CpuPrintThreadMetric(domain, "cpu_threadIDs", "cpu_times")
+	// queue time is similar to %RDY (ready/steal time)
 	queuetimeAllCores := CpuPrintThreadMetric(domain, "cpu_threadIDs", "cpu_runqueues")
 
-	// cpu util for for other threads (i/o or emulation)
+	// cpu util for other threads (i/o or emulation) - similar to %SYS in esxtop
 	otherCputimeAllCores := CpuPrintThreadMetric(domain, "cpu_otherThreadIDs", "cpu_other_times")
 	otherQueuetimeAllCores := CpuPrintThreadMetric(domain, "cpu_otherThreadIDs", "cpu_other_runqueues")
 
-	// put results together
-	result := append([]string{cores}, cputimeAllCores, queuetimeAllCores)
+	// put results together - include %sys (other threads) by default (esxtop style)
+	result := append([]string{cores}, cputimeAllCores, queuetimeAllCores, otherCputimeAllCores)
 	if config.Options.Verbose {
-		result = append(result, otherCputimeAllCores, otherQueuetimeAllCores)
+		result = append(result, otherQueuetimeAllCores)
 	}
 	return result
 }
@@ -152,4 +154,80 @@ func removeFromArray(s []int, r int) []int {
 		}
 	}
 	return s
+}
+
+// cpuLookupProxmox handles CPU lookup for Proxmox VMs
+func cpuLookupProxmox(domain *models.Domain, vmInfo connector.VMInfo) {
+	// Get cores from VM info or config
+	var cores int
+	if vmInfo.Cores > 0 {
+		cores = vmInfo.Cores
+	} else {
+		// Try to get from Proxmox connector
+		proxmoxConn, ok := connector.CurrentConnector.(*connector.ProxmoxConnector)
+		if ok {
+			threads, err := proxmoxConn.GetCPUThreads(vmInfo)
+			if err == nil {
+				cores = len(threads)
+			}
+		}
+	}
+	if cores == 0 {
+		cores = 1 // Default to 1 core
+	}
+	newMeasurementCores := models.CreateMeasurement(uint64(cores))
+	domain.AddMetricMeasurement("cpu_cores", newMeasurementCores)
+
+	// cache old thread IDs for cleanup
+	var oldThreadIds []int
+	oldThreadIds = append(oldThreadIds, domain.GetMetricIntArray("cpu_threadIDs")...)
+	oldThreadIds = append(oldThreadIds, domain.GetMetricIntArray("cpu_otherThreadIDs")...)
+
+	// Get vCPU thread IDs from Proxmox
+	var coreThreadIDs []int
+	proxmoxConn, ok := connector.CurrentConnector.(*connector.ProxmoxConnector)
+	if ok {
+		threads, err := proxmoxConn.GetCPUThreads(vmInfo)
+		if err == nil {
+			coreThreadIDs = threads
+		}
+	}
+
+	for _, threadID := range coreThreadIDs {
+		oldThreadIds = removeFromArray(oldThreadIds, threadID)
+	}
+	newMeasurementThreads := models.CreateMeasurement(coreThreadIDs)
+	domain.AddMetricMeasurement("cpu_threadIDs", newMeasurementThreads)
+
+	// get other thread IDs from /proc/<pid>/task
+	tasksFolder := fmt.Sprint(config.Options.ProcFS, "/", domain.PID, "/task/*")
+	files, err := filepath.Glob(tasksFolder)
+	if err != nil {
+		return
+	}
+	otherThreadIDs := make([]int, 0)
+	for _, f := range files {
+		taskID, _ := strconv.Atoi(path.Base(f))
+		found := false
+		for _, n := range coreThreadIDs {
+			if taskID == n {
+				found = true
+				break
+			}
+		}
+		if found {
+			continue
+		}
+		otherThreadIDs = append(otherThreadIDs, taskID)
+		oldThreadIds = removeFromArray(oldThreadIds, taskID)
+	}
+	domain.AddMetricMeasurement("cpu_otherThreadIDs", models.CreateMeasurement(otherThreadIDs))
+
+	// remove cached but not existent thread IDs
+	for _, id := range oldThreadIds {
+		domain.DelMetricMeasurement(fmt.Sprint("cpu_times_", id))
+		domain.DelMetricMeasurement(fmt.Sprint("cpu_runqueues_", id))
+		domain.DelMetricMeasurement(fmt.Sprint("cpu_other_times_", id))
+		domain.DelMetricMeasurement(fmt.Sprint("cpu_other_runqueues_", id))
+	}
 }

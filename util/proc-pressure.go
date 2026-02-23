@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"kvmtop/config"
+	"proxtop/config"
 )
 
 // some avg10=0.00 avg60=0.00 avg300=0.00 total=109155294

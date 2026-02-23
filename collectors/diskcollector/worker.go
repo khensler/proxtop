@@ -6,9 +6,10 @@ import (
 	"strconv"
 	"strings"
 
-	"kvmtop/config"
-	"kvmtop/models"
-	"kvmtop/util"
+	"proxtop/config"
+	"proxtop/connector"
+	"proxtop/models"
+	"proxtop/util"
 	libvirt "github.com/libvirt/libvirt-go"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 )
@@ -166,23 +167,62 @@ func diskPrint(domain *models.Domain) []string {
 	allocation, _ := domain.GetMetricUint64("disk_size_allocation", 0)
 	physical, _ := domain.GetMetricUint64("disk_size_physical", 0)
 
-	// errs := domain.GetMetricDiffUint64("disk_stats_errs", true)
-	flushreq := domain.GetMetricDiffUint64("disk_stats_flushreq", true)
-	flushtotaltimes := domain.GetMetricDiffUint64("disk_stats_flushtotaltimes", true)
-	rdbytes := domain.GetMetricDiffUint64("disk_stats_rdbytes", true)
-	rdreq := domain.GetMetricDiffUint64("disk_stats_rdreq", true)
-	rdtotaltimes := domain.GetMetricDiffUint64("disk_stats_rdtotaltimes", true)
-	wrbytes := domain.GetMetricDiffUint64("disk_stats_wrbytes", true)
-	wrreq := domain.GetMetricDiffUint64("disk_stats_wrreq", true)
-	wrtotaltimes := domain.GetMetricDiffUint64("disk_stats_wrtotaltimes", true)
+	// Get IO stats as floats for calculation
+	flushreqFloat := domain.GetMetricDiffUint64AsFloat("disk_stats_flushreq", true)
+	flushtotaltimesFloat := domain.GetMetricDiffUint64AsFloat("disk_stats_flushtotaltimes", true)
+	rdbytesFloat := domain.GetMetricDiffUint64AsFloat("disk_stats_rdbytes", true)
+	rdreqFloat := domain.GetMetricDiffUint64AsFloat("disk_stats_rdreq", true)
+	rdtotaltimesFloat := domain.GetMetricDiffUint64AsFloat("disk_stats_rdtotaltimes", true)
+	wrbytesFloat := domain.GetMetricDiffUint64AsFloat("disk_stats_wrbytes", true)
+	wrreqFloat := domain.GetMetricDiffUint64AsFloat("disk_stats_wrreq", true)
+	wrtotaltimesFloat := domain.GetMetricDiffUint64AsFloat("disk_stats_wrtotaltimes", true)
 
 	delayblkio := domain.GetMetricDiffUint64("disk_delayblkio", true)
 
 	ioutil := domain.GetMetricString("disk_ioutil", 0)
 
-	result := append([]string{capacity}, allocation, ioutil)
+	// esxtop style: READS/s, WRITES/s, MBRD/s, MBWR/s, LAT/rd (ms), LAT/wr (ms)
+	rdreq := fmt.Sprintf("%.0f", rdreqFloat)
+	wrreq := fmt.Sprintf("%.0f", wrreqFloat)
+	mbRead := fmt.Sprintf("%.2f", rdbytesFloat/1024/1024)
+	mbWrite := fmt.Sprintf("%.2f", wrbytesFloat/1024/1024)
+
+	// Calculate average latency in ms (total time in ns / requests)
+	var latRd, latWr, latFl, latAvg string
+	if rdreqFloat > 0 {
+		latRd = fmt.Sprintf("%.2f", rdtotaltimesFloat/rdreqFloat/1000000) // ns to ms
+	} else {
+		latRd = "0.00"
+	}
+	if wrreqFloat > 0 {
+		latWr = fmt.Sprintf("%.2f", wrtotaltimesFloat/wrreqFloat/1000000) // ns to ms
+	} else {
+		latWr = "0.00"
+	}
+	if flushreqFloat > 0 {
+		latFl = fmt.Sprintf("%.2f", flushtotaltimesFloat/flushreqFloat/1000000) // ns to ms
+	} else {
+		latFl = "0.00"
+	}
+
+	// Calculate overall average latency (combined rd+wr+flush)
+	totalOps := rdreqFloat + wrreqFloat + flushreqFloat
+	totalTime := rdtotaltimesFloat + wrtotaltimesFloat + flushtotaltimesFloat
+	if totalOps > 0 {
+		latAvg = fmt.Sprintf("%.2f", totalTime/totalOps/1000000)
+	} else {
+		latAvg = "0.00"
+	}
+
+	// Default: SIZE, ALLOC, %UTIL, READS/s, WRITES/s, MBRD/s, MBWR/s, LAT/rd, LAT/wr, LAT/fl, LAT/avg
+	result := append([]string{capacity}, allocation, ioutil, rdreq, wrreq, mbRead, mbWrite, latRd, latWr, latFl, latAvg)
 	if config.Options.Verbose {
-		result = append(result, physical, flushreq, flushtotaltimes, rdbytes, rdreq, rdtotaltimes, wrbytes, wrreq, wrtotaltimes, delayblkio)
+		flushreq := fmt.Sprintf("%.0f", flushreqFloat)
+		// Total time breakdown (in ms)
+		rdTotalMs := fmt.Sprintf("%.0f", rdtotaltimesFloat/1000000)
+		wrTotalMs := fmt.Sprintf("%.0f", wrtotaltimesFloat/1000000)
+		flTotalMs := fmt.Sprintf("%.0f", flushtotaltimesFloat/1000000)
+		result = append(result, physical, flushreq, rdTotalMs, wrTotalMs, flTotalMs, delayblkio)
 	}
 	return result
 }
@@ -217,4 +257,112 @@ func estimateIOUtil(domain *models.Domain, host *models.Host) string {
 	//fmt.Printf("\thost: %.0f MB/s domain: %.0f MB/s - hostio: %d%% domainio: %s%%\n", hostLoad/1024/1024, domainLoad/1024/1024, hostIOUtil, domainIOUtilStr)
 
 	return domainIOUtilStr
+}
+
+// diskLookupProxmox handles disk lookup for Proxmox VMs
+func diskLookupProxmox(domain *models.Domain, vmInfo connector.VMInfo) {
+	// Get disk stats from Proxmox connector
+	proxmoxConn, ok := connector.CurrentConnector.(*connector.ProxmoxConnector)
+	if !ok {
+		return
+	}
+
+	// Get totals
+	stats, err := proxmoxConn.GetDiskStats(vmInfo)
+	if err != nil {
+		return
+	}
+
+	// Get per-disk stats
+	perDiskStats, diskNames, perErr := proxmoxConn.GetPerDiskStats(vmInfo)
+	if perErr == nil && len(diskNames) > 0 {
+		// Store disk device list
+		domain.AddMetricMeasurement("disk_devices", models.CreateMeasurement(diskNames))
+
+		// Store per-disk stats
+		for diskName, diskStats := range perDiskStats {
+			domain.AddMetricMeasurement(fmt.Sprintf("disk_stats_rdbytes_%s", diskName), models.CreateMeasurement(uint64(diskStats.RdBytes)))
+			domain.AddMetricMeasurement(fmt.Sprintf("disk_stats_wrbytes_%s", diskName), models.CreateMeasurement(uint64(diskStats.WrBytes)))
+			domain.AddMetricMeasurement(fmt.Sprintf("disk_stats_rdreq_%s", diskName), models.CreateMeasurement(uint64(diskStats.RdReq)))
+			domain.AddMetricMeasurement(fmt.Sprintf("disk_stats_wrreq_%s", diskName), models.CreateMeasurement(uint64(diskStats.WrReq)))
+			domain.AddMetricMeasurement(fmt.Sprintf("disk_stats_flushreq_%s", diskName), models.CreateMeasurement(uint64(diskStats.FlushReq)))
+			domain.AddMetricMeasurement(fmt.Sprintf("disk_stats_rdtotaltimes_%s", diskName), models.CreateMeasurement(uint64(diskStats.RdTotalTimes)))
+			domain.AddMetricMeasurement(fmt.Sprintf("disk_stats_wrtotaltimes_%s", diskName), models.CreateMeasurement(uint64(diskStats.WrTotalTimes)))
+			domain.AddMetricMeasurement(fmt.Sprintf("disk_stats_flushtotaltimes_%s", diskName), models.CreateMeasurement(uint64(diskStats.FlushTotalTimes)))
+		}
+	}
+
+	// sizes (totals)
+	domain.AddMetricMeasurement("disk_size_capacity", models.CreateMeasurement(stats.Capacity))
+	domain.AddMetricMeasurement("disk_size_allocation", models.CreateMeasurement(stats.Capacity)) // Use capacity as allocation
+	domain.AddMetricMeasurement("disk_size_physical", models.CreateMeasurement(stats.Physical))
+
+	// IOs (totals)
+	domain.AddMetricMeasurement("disk_stats_flushreq", models.CreateMeasurement(uint64(stats.FlushReq)))
+	domain.AddMetricMeasurement("disk_stats_flushtotaltimes", models.CreateMeasurement(uint64(stats.FlushTotalTimes)))
+	domain.AddMetricMeasurement("disk_stats_rdbytes", models.CreateMeasurement(uint64(stats.RdBytes)))
+	domain.AddMetricMeasurement("disk_stats_rdreq", models.CreateMeasurement(uint64(stats.RdReq)))
+	domain.AddMetricMeasurement("disk_stats_rdtotaltimes", models.CreateMeasurement(uint64(stats.RdTotalTimes)))
+	domain.AddMetricMeasurement("disk_stats_wrbytes", models.CreateMeasurement(uint64(stats.WrBytes)))
+	domain.AddMetricMeasurement("disk_stats_wrreq", models.CreateMeasurement(uint64(stats.WrReq)))
+	domain.AddMetricMeasurement("disk_stats_wrtotaltimes", models.CreateMeasurement(uint64(stats.WrTotalTimes)))
+
+	// disk sources - use Proxmox storage path
+	domain.AddMetricMeasurement("disk_sources", models.CreateMeasurement(fmt.Sprintf("/var/lib/vz/images/%s", vmInfo.VMID)))
+}
+
+// DiskPrintPerDevice returns per-disk stats for a domain
+// Returns a map of disk device name -> []string (same format as diskPrint but per-device)
+func DiskPrintPerDevice(domain *models.Domain) map[string][]string {
+	diskDevices := domain.GetMetricStringArray("disk_devices")
+	result := make(map[string][]string)
+
+	for _, devname := range diskDevices {
+		// Get per-disk stats
+		rdBytesFloat := domain.GetMetricDiffUint64AsFloat(fmt.Sprintf("disk_stats_rdbytes_%s", devname), true)
+		wrBytesFloat := domain.GetMetricDiffUint64AsFloat(fmt.Sprintf("disk_stats_wrbytes_%s", devname), true)
+		rdReqFloat := domain.GetMetricDiffUint64AsFloat(fmt.Sprintf("disk_stats_rdreq_%s", devname), true)
+		wrReqFloat := domain.GetMetricDiffUint64AsFloat(fmt.Sprintf("disk_stats_wrreq_%s", devname), true)
+		flReqFloat := domain.GetMetricDiffUint64AsFloat(fmt.Sprintf("disk_stats_flushreq_%s", devname), true)
+		rdTotalTimesFloat := domain.GetMetricDiffUint64AsFloat(fmt.Sprintf("disk_stats_rdtotaltimes_%s", devname), true)
+		wrTotalTimesFloat := domain.GetMetricDiffUint64AsFloat(fmt.Sprintf("disk_stats_wrtotaltimes_%s", devname), true)
+		flTotalTimesFloat := domain.GetMetricDiffUint64AsFloat(fmt.Sprintf("disk_stats_flushtotaltimes_%s", devname), true)
+
+		// Calculate stats same as diskPrint
+		rdReq := fmt.Sprintf("%.0f", rdReqFloat)
+		wrReq := fmt.Sprintf("%.0f", wrReqFloat)
+		mbRead := fmt.Sprintf("%.2f", rdBytesFloat/1024/1024)
+		mbWrite := fmt.Sprintf("%.2f", wrBytesFloat/1024/1024)
+
+		var latRd, latWr, latFl, latAvg string
+		if rdReqFloat > 0 {
+			latRd = fmt.Sprintf("%.2f", rdTotalTimesFloat/rdReqFloat/1000000)
+		} else {
+			latRd = "0.00"
+		}
+		if wrReqFloat > 0 {
+			latWr = fmt.Sprintf("%.2f", wrTotalTimesFloat/wrReqFloat/1000000)
+		} else {
+			latWr = "0.00"
+		}
+		if flReqFloat > 0 {
+			latFl = fmt.Sprintf("%.2f", flTotalTimesFloat/flReqFloat/1000000)
+		} else {
+			latFl = "0.00"
+		}
+
+		// Calculate overall average latency
+		totalOps := rdReqFloat + wrReqFloat + flReqFloat
+		totalTime := rdTotalTimesFloat + wrTotalTimesFloat + flTotalTimesFloat
+		if totalOps > 0 {
+			latAvg = fmt.Sprintf("%.2f", totalTime/totalOps/1000000)
+		} else {
+			latAvg = "0.00"
+		}
+
+		// READS/s, WRITES/s, MBRD/s, MBWR/s, LAT/rd, LAT/wr, LAT/fl, LAT/avg
+		result[devname] = []string{rdReq, wrReq, mbRead, mbWrite, latRd, latWr, latFl, latAvg}
+	}
+
+	return result
 }

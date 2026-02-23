@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"kvmtop/config"
+	"proxtop/config"
 )
 
 // ProcCpuinfo represents one entry of cpuinfo proc file

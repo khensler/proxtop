@@ -5,23 +5,23 @@ import (
 
 	"fmt"
 
-	"kvmtop/collectors/cpucollector"
-	"kvmtop/collectors/diskcollector"
-	"kvmtop/collectors/hostcollector"
-	"kvmtop/collectors/iocollector"
-	"kvmtop/collectors/memcollector"
-	"kvmtop/collectors/netcollector"
-	"kvmtop/collectors/psicollector"
-	"kvmtop/config"
-	"kvmtop/models"
-	"kvmtop/printers"
+	"proxtop/collectors/cpucollector"
+	"proxtop/collectors/diskcollector"
+	"proxtop/collectors/hostcollector"
+	"proxtop/collectors/iocollector"
+	"proxtop/collectors/memcollector"
+	"proxtop/collectors/netcollector"
+	"proxtop/collectors/psicollector"
+	"proxtop/config"
+	"proxtop/models"
+	"proxtop/printers"
 	flags "github.com/jessevdk/go-flags"
 )
 
 func initializeFlags() {
 	// initialize parser for flags
 	parser := flags.NewParser(&config.Options, flags.Default)
-	parser.ShortDescription = "kvmtop"
+	parser.ShortDescription = "proxtop"
 	parser.LongDescription = "Monitor virtual machine experience from outside on KVM hypervisor level"
 
 	// Parse parameters
@@ -70,9 +70,12 @@ func initializeFlags() {
 	}
 
 	if !hasCollector {
-		// no collector selected, going to add default collector
+		// no collector selected, enable all common collectors for full functionality
 		enableCPU()
 		enableMEM()
+		enableDISK()
+		enableNET()
+		enableIO()
 	}
 
 	// select printer, ncurse as default.

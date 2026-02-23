@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"kvmtop/config"
+	"proxtop/config"
 )
 
 // ProcDiskstat defines the fields of one row (one block device) of a /proc/diskstats file

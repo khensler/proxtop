@@ -1,8 +1,8 @@
 package memcollector
 
 import (
-	"kvmtop/models"
-	"kvmtop/util"
+	"proxtop/models"
+	"proxtop/util"
 )
 
 func hostCollect(host *models.Host) {

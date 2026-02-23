@@ -1,0 +1,13 @@
+[Unit]
+Description=Profiler for virtual machine monitoring proxtop
+After=libvirtd.service
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=3
+EnvironmentFile=/etc/proxtop.conf
+ExecStart=/usr/bin/proxprofiler --printer=json --output=tcp --target=${PROXTOP_TARGET} --cpu --net --mem --io --disk --host --verbose ${PROXPROFILER_PARAMS}
+
+[Install]
+WantedBy=multi-user.target

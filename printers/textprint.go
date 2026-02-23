@@ -3,7 +3,7 @@ package printers
 import (
 	"fmt"
 
-	"kvmtop/models"
+	"proxtop/models"
 )
 
 var showheader = true

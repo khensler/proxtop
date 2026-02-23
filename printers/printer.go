@@ -5,7 +5,7 @@ import (
 	"net"
 	"os"
 
-	"kvmtop/config"
+	"proxtop/config"
 )
 
 var conn net.Conn

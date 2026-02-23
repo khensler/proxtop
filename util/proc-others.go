@@ -6,7 +6,7 @@ import (
 	"log"
 	"strconv"
 
-	"kvmtop/config"
+	"proxtop/config"
 )
 
 // GetCmdLine reads the cmdline for a process from /proc

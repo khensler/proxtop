@@ -3,9 +3,9 @@ package hostcollector
 import (
 	"os"
 
-	"kvmtop/config"
-	"kvmtop/models"
-	"kvmtop/util"
+	"proxtop/config"
+	"proxtop/models"
+	"proxtop/util"
 )
 
 func hostLookup(host *models.Host) {

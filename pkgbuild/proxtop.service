@@ -1,0 +1,13 @@
+[Unit]
+Description=Monitor virtual machine experience from outside on KVM/Proxmox hypervisor level
+After=libvirtd.service
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=3
+EnvironmentFile=/etc/proxtop.conf
+ExecStart=/usr/bin/proxtop --printer=json --output=tcp --target=${PROXTOP_TARGET} --cpu --net --mem --io --disk --host --verbose
+
+[Install]
+WantedBy=multi-user.target

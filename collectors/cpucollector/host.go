@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"strconv"
 
-	"kvmtop/config"
-	"kvmtop/models"
+	"proxtop/config"
+	"proxtop/models"
 
-	"kvmtop/util"
+	"proxtop/util"
 	"gonum.org/v1/gonum/stat"
 )
 
@@ -77,10 +77,10 @@ func cpuPrintHost(host *models.Host) []string {
 	cpuGuest := toPercent(host, "cpu_guest", cores)
 	cpuGuestNice := toPercent(host, "cpu_guestnice", cores)
 
-	// put results together
-	result := append([]string{cpuCores}, cpuCurfreq, cpuUser, cpuSystem, cpuIdle, cpuSteal)
+	// put results together - include iowait by default (esxtop style)
+	result := append([]string{cpuCores}, cpuCurfreq, cpuUser, cpuSystem, cpuIdle, cpuSteal, cpuIOWait)
 	if config.Options.Verbose {
-		result = append(result, cpuMinfreq, cpuMaxfreq, cpuNice, cpuIOWait, cpuIRQ, cpuSoftIRQ, cpuGuest, cpuGuestNice)
+		result = append(result, cpuMinfreq, cpuMaxfreq, cpuNice, cpuIRQ, cpuSoftIRQ, cpuGuest, cpuGuestNice)
 	}
 	return result
 }

@@ -1,8 +1,10 @@
 package netcollector
 
 import (
-	"kvmtop/models"
-	"kvmtop/util"
+	"fmt"
+
+	"proxtop/models"
+	"proxtop/util"
 )
 
 func domainCollect(domain *models.Domain) {
@@ -19,6 +21,17 @@ func domainCollect(domain *models.Domain) {
 	for _, devname := range ifs {
 		devStats := util.GetProcPIDNetDev(domain.PID, devname)
 
+		// Store per-interface stats with device name suffix
+		domain.AddMetricMeasurement(fmt.Sprintf("net_ReceivedBytes_%s", devname), models.CreateMeasurement(uint64(devStats.ReceivedBytes)))
+		domain.AddMetricMeasurement(fmt.Sprintf("net_ReceivedPackets_%s", devname), models.CreateMeasurement(uint64(devStats.ReceivedPackets)))
+		domain.AddMetricMeasurement(fmt.Sprintf("net_ReceivedErrs_%s", devname), models.CreateMeasurement(uint64(devStats.ReceivedErrs)))
+		domain.AddMetricMeasurement(fmt.Sprintf("net_ReceivedDrop_%s", devname), models.CreateMeasurement(uint64(devStats.ReceivedDrop)))
+		domain.AddMetricMeasurement(fmt.Sprintf("net_TransmittedBytes_%s", devname), models.CreateMeasurement(uint64(devStats.TransmittedBytes)))
+		domain.AddMetricMeasurement(fmt.Sprintf("net_TransmittedPackets_%s", devname), models.CreateMeasurement(uint64(devStats.TransmittedPackets)))
+		domain.AddMetricMeasurement(fmt.Sprintf("net_TransmittedErrs_%s", devname), models.CreateMeasurement(uint64(devStats.TransmittedErrs)))
+		domain.AddMetricMeasurement(fmt.Sprintf("net_TransmittedDrop_%s", devname), models.CreateMeasurement(uint64(devStats.TransmittedDrop)))
+
+		// Sum for totals
 		statsSum.ReceivedBytes += devStats.ReceivedBytes
 		statsSum.ReceivedPackets += devStats.ReceivedPackets
 		statsSum.ReceivedErrs += devStats.ReceivedErrs
@@ -37,6 +50,7 @@ func domainCollect(domain *models.Domain) {
 		statsSum.TransmittedCarrier += devStats.TransmittedCarrier
 		statsSum.TransmittedCompressed += devStats.TransmittedCompressed
 	}
+	// Store totals (for backward compatibility)
 	domain.AddMetricMeasurement("net_ReceivedBytes", models.CreateMeasurement(uint64(statsSum.ReceivedBytes)))
 	domain.AddMetricMeasurement("net_ReceivedPackets", models.CreateMeasurement(uint64(statsSum.ReceivedPackets)))
 	domain.AddMetricMeasurement("net_ReceivedErrs", models.CreateMeasurement(uint64(statsSum.ReceivedErrs)))

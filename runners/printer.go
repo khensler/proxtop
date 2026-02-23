@@ -4,11 +4,14 @@ import (
 	"sync"
 	"time"
 
-	"kvmtop/config"
-	"kvmtop/models"
+	"proxtop/config"
+	"proxtop/models"
 )
 
 var collectors []string
+
+// LastRefreshDuration holds the actual measured time of the last refresh cycle
+var LastRefreshDuration time.Duration
 
 // InitializePrinter starts the periodic print calls
 func InitializePrinter(wg *sync.WaitGroup) {
@@ -22,14 +25,52 @@ func InitializePrinter(wg *sync.WaitGroup) {
 		return true
 	})
 
+	// Wait for domains to be discovered before first print
+	// Poll until we have at least one domain, with timeout
+	waitStart := time.Now()
+	for models.Collection.Domains.Length() == 0 {
+		if time.Since(waitStart) > 5*time.Second {
+			// Give up waiting - print headers anyway
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
 	// start continuously printing values
-	start := time.Now()
+	lastDataRefresh := time.Now()
 	for n := 0; config.Options.Runs == -1 || n < config.Options.Runs; n++ {
-		// sleep before execution
-		nextRun := start.Add(time.Duration(config.Options.Frequency) * time.Second)
-		time.Sleep(nextRun.Sub(time.Now()))
+		// For first print, don't wait - print immediately after collectors have run
+		// For subsequent prints, wait for the configured interval
+		if n > 0 {
+			nextDataRun := lastDataRefresh.Add(time.Duration(config.Options.Frequency) * time.Second)
+
+			// Wait until next data run time
+			// If collection is paused (overlay shown), use short intervals for responsive UI
+			// Otherwise, sleep until the next scheduled time
+			for {
+				if CollectionPaused {
+					// Overlay shown - redraw frequently for responsive UI
+					time.Sleep(100 * time.Millisecond)
+					Print()
+				} else if time.Now().Before(nextDataRun) {
+					// Normal mode - sleep until next data run
+					sleepDuration := nextDataRun.Sub(time.Now())
+					if sleepDuration > 0 {
+						time.Sleep(sleepDuration)
+					}
+					break
+				} else {
+					break
+				}
+			}
+		}
+
+		// Measure actual refresh interval (only when data is collected)
+		now := time.Now()
+		LastRefreshDuration = now.Sub(lastDataRefresh)
+		lastDataRefresh = now
+
 		Print()
-		start = time.Now()
 	}
 
 	// close configured printer

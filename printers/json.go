@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"kvmtop/models"
+	"proxtop/models"
 )
 
 // JSONPrinter describes the json printer

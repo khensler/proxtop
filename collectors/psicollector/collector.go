@@ -1,8 +1,8 @@
 package psicollector
 
 import (
-	"kvmtop/config"
-	"kvmtop/models"
+	"proxtop/config"
+	"proxtop/models"
 )
 
 // Collector describes the Pressure Stall Information (PSI) collector

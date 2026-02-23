@@ -6,7 +6,7 @@ import (
 	"os"
 	"strconv"
 
-	"kvmtop/config"
+	"proxtop/config"
 )
 
 // ProcPIDIO defines the fields of a /proc/[pid]/io file

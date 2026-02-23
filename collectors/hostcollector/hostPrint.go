@@ -1,8 +1,8 @@
 package hostcollector
 
 import (
-	"kvmtop/config"
-	"kvmtop/models"
+	"proxtop/config"
+	"proxtop/models"
 )
 
 func hostPrint(host *models.Host) []string {

@@ -1,8 +1,9 @@
 package memcollector
 
 import (
-	"kvmtop/config"
-	"kvmtop/models"
+	"proxtop/config"
+	"proxtop/connector"
+	"proxtop/models"
 )
 
 // Collector describes the memory collector
@@ -17,8 +18,15 @@ func (collector *Collector) Lookup() {
 	models.Collection.Domains.Range(func(key, value interface{}) bool {
 		uuid := key.(string)
 		domain := value.(models.Domain)
-		libvirtDomain, _ := models.Collection.LibvirtDomains.Load(uuid)
-		domainLookup(&domain, libvirtDomain)
+		if connector.IsProxmox() {
+			vmInfo, ok := connector.ProxmoxVMStore.Load(uuid)
+			if ok {
+				domainLookupProxmox(&domain, vmInfo)
+			}
+		} else {
+			libvirtDomain, _ := models.Collection.LibvirtDomains.Load(uuid)
+			domainLookup(&domain, libvirtDomain)
+		}
 		return true
 	})
 	hostLookup(&models.Collection.Host)
@@ -38,69 +46,78 @@ func (collector *Collector) Collect() {
 
 // Print returns the collectors measurements in a Printable struct
 func (collector *Collector) Print() models.Printable {
+	// Host fields - esxtop style naming
 	hostFields := []string{
-		"ram_Total",
-		"ram_Free",
-		"ram_Available",
+		"mem_Total",
+		"mem_Free",
+		"mem_Avail",
+		"mem_Cached",
+		"mem_Active",
+		"mem_SwapUsed",
 	}
+	// Domain fields - esxtop style: MEMSZ (total), GRANT (used), RSS, page faults
 	domainFields := []string{
-		"ram_total",
-		"ram_used",
+		"mem_MEMSZ",
+		"mem_GRANT",
+		"mem_FREE",
+		"mem_%ACTV",
+		"mem_RSS",
+		"mem_MCTL",
+		"mem_MINFLT",
+		"mem_MAJFLT",
 	}
 	if config.Options.Verbose {
 		hostFields = append(hostFields,
-			"ram_Buffers",
-			"ram_Cached",
-			"ram_SwapCached",
-			"ram_Active",
-			"ram_Inactive",
-			"ram_ActiveAanon",
-			"ram_InactiveAanon",
-			"ram_ActiveFile",
-			"ram_InactiveFile",
-			"ram_Unevictable",
-			"ram_Mlocked",
-			"ram_SwapTotal",
-			"ram_SwapFree",
-			"ram_Dirty",
-			"ram_Writeback",
-			"ram_AnonPages",
-			"ram_Mapped",
-			"ram_Shmem",
-			"ram_Slab",
-			"ram_SReclaimable",
-			"ram_SUnreclaim",
-			"ram_KernelStack",
-			"ram_PageTables",
-			"ram_NFSUnstable",
-			"ram_Bounce",
-			"ram_WritebackTmp",
-			"ram_CommitLimit",
-			"ram_CommittedAS",
-			"ram_VmallocTotal",
-			"ram_VmallocUsed",
-			"ram_VmallocChunk",
-			"ram_HardwareCorrupted",
-			"ram_AnonHugePages",
-			"ram_ShmemHugePages",
-			"ram_ShmemPmdMapped",
-			"ram_HugePagesTotal",
-			"ram_HugePagesFree",
-			"ram_HugePagesRsvd",
-			"ram_HugePagesSurp",
-			"ram_Hugepagesize",
-			"ram_Hugetlb",
-			"ram_DirectMap4k",
-			"ram_DirectMap2M",
-			"ram_DirectMap1G",
+			"mem_Buffers",
+			"mem_SwapCached",
+			"mem_Inactive",
+			"mem_ActiveAnon",
+			"mem_InactiveAnon",
+			"mem_ActiveFile",
+			"mem_InactiveFile",
+			"mem_Unevictable",
+			"mem_Mlocked",
+			"mem_SwapTotal",
+			"mem_SwapFree",
+			"mem_Dirty",
+			"mem_Writeback",
+			"mem_AnonPages",
+			"mem_Mapped",
+			"mem_Shmem",
+			"mem_Slab",
+			"mem_SReclaimable",
+			"mem_SUnreclaim",
+			"mem_KernelStack",
+			"mem_PageTables",
+			"mem_NFSUnstable",
+			"mem_Bounce",
+			"mem_WritebackTmp",
+			"mem_CommitLimit",
+			"mem_CommittedAS",
+			"mem_VmallocTotal",
+			"mem_VmallocUsed",
+			"mem_VmallocChunk",
+			"mem_HardwareCorrupted",
+			"mem_AnonHugePages",
+			"mem_ShmemHugePages",
+			"mem_ShmemPmdMapped",
+			"mem_HugePagesTotal",
+			"mem_HugePagesFree",
+			"mem_HugePagesRsvd",
+			"mem_HugePagesSurp",
+			"mem_Hugepagesize",
+			"mem_Hugetlb",
+			"mem_DirectMap4k",
+			"mem_DirectMap2M",
+			"mem_DirectMap1G",
 		)
 		domainFields = append(domainFields,
-			"ram_vsize",
-			"ram_rss",
-			"ram_minflt",
-			"ram_cminflt",
-			"ram_majflt",
-			"ram_cmajflt",
+			"mem_MAXSZ",
+			"mem_VSIZE",
+			"mem_SWAPIN",
+			"mem_SWAPOUT",
+			"mem_CMINFLT",
+			"mem_CMAJFLT",
 		)
 	}
 

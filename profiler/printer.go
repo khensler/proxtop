@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"kvmtop/printers"
+	"proxtop/printers"
 	"github.com/cha87de/tsprofiler/models"
 )
 

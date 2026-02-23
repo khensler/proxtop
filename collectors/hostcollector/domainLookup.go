@@ -3,7 +3,7 @@ package hostcollector
 import (
 	"os"
 
-	"kvmtop/models"
+	"proxtop/models"
 	libvirt "github.com/libvirt/libvirt-go"
 )
 

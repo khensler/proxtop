@@ -1,6 +1,6 @@
 package hostcollector
 
-import "kvmtop/models"
+import "proxtop/models"
 
 func hostCollect(host *models.Host) {
 	// nothing to do

@@ -3,10 +3,10 @@ package psicollector
 import (
 	"fmt"
 
-	"kvmtop/config"
-	"kvmtop/util"
+	"proxtop/config"
+	"proxtop/util"
 
-	"kvmtop/models"
+	"proxtop/models"
 )
 
 func hostLookup(host *models.Host) {

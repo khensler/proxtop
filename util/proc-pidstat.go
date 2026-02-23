@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 	"strconv"
 
-	"kvmtop/config"
+	"proxtop/config"
 )
 
 // ProcPIDStat defines the fields of a /proc/[pid]/stat file

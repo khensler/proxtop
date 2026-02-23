@@ -3,8 +3,9 @@ package diskcollector
 import (
 	"strings"
 
-	"kvmtop/config"
-	"kvmtop/models"
+	"proxtop/config"
+	"proxtop/connector"
+	"proxtop/models"
 )
 
 // Collector describes the disk collector
@@ -19,9 +20,17 @@ func (collector *Collector) Lookup() {
 	models.Collection.Domains.Range(func(key, value interface{}) bool {
 		uuid := key.(string)
 		domain := value.(models.Domain)
-		libvirtDomain, _ := models.Collection.LibvirtDomains.Load(uuid)
 
-		diskLookup(&domain, libvirtDomain)
+		if connector.IsProxmox() {
+			vmInfo, ok := connector.ProxmoxVMStore.Load(uuid)
+			if ok {
+				diskLookupProxmox(&domain, vmInfo)
+			}
+		} else {
+			libvirtDomain, _ := models.Collection.LibvirtDomains.Load(uuid)
+			diskLookup(&domain, libvirtDomain)
+		}
+
 		// merge sourcedir metrics from domains to one metric for host
 		disksources := strings.Split(domain.GetMetricString("disk_sources", 0), ",")
 		for _, disksource := range disksources {
@@ -55,43 +64,52 @@ func (collector *Collector) Collect() {
 
 // Print returns the collectors measurements in a Printable struct
 func (collector *Collector) Print() models.Printable {
+	// Host fields - esxtop style
 	hostFields := []string{
-		"disk_device_reads",
-		"disk_device_writes",
-		"disk_device_ioutil",
+		"dsk_READS/s",
+		"dsk_WRITES/s",
+		"dsk_%UTIL",
 	}
+	// Domain fields - esxtop style with latency breakout
+	// LAT/rd, LAT/wr, LAT/fl = average latency for read/write/flush operations (ms)
+	// LAT/avg = overall average latency combining all operation types (ms)
 	domainFields := []string{
-		"disk_size_capacity",
-		"disk_size_allocation",
-		"disk_ioutil",
+		"dsk_SIZE",
+		"dsk_ALLOC",
+		"dsk_%UTIL",
+		"dsk_READS/s",
+		"dsk_WRITES/s",
+		"dsk_MBRD/s",
+		"dsk_MBWR/s",
+		"dsk_LAT/rd",
+		"dsk_LAT/wr",
+		"dsk_LAT/fl",
+		"dsk_LAT/avg",
 	}
 	if config.Options.Verbose {
 		hostFields = append(hostFields,
-			"disk_device_readsmerged",
-			"disk_device_sectorsread",
-			"disk_device_timereading",
-			"disk_device_writesmerged",
-			"disk_device_sectorswritten",
-			"disk_device_timewriting",
-			"disk_device_currentops",
-			"disk_device_timeforops",
-			"disk_device_weightedtimeforops",
-			"disk_device_count",
-			"disk_device_queuesize",
-			"disk_device_queuetime",
-			"disk_device_servicetime",
+			"dsk_rdmerged",
+			"dsk_sectorsrd",
+			"dsk_timerd",
+			"dsk_wrmerged",
+			"dsk_sectorswr",
+			"dsk_timewr",
+			"dsk_currentops",
+			"dsk_timeforops",
+			"dsk_weightedtime",
+			"dsk_count",
+			"dsk_queuesize",
+			"dsk_queuetime",
+			"dsk_servicetime",
 		)
+		// Verbose adds: physical size, flush ops/s, and total time breakdown (rd/wr/flush in ms)
 		domainFields = append(domainFields,
-			"disk_size_physical",
-			"disk_stats_flushreq",
-			"disk_stats_flushtotaltimes",
-			"disk_stats_rdbytes",
-			"disk_stats_rdreq",
-			"disk_stats_rdtotaltimes",
-			"disk_stats_wrbytes",
-			"disk_stats_wrreq",
-			"disk_stats_wrtotaltimes",
-			"disk_delayblkio",
+			"dsk_PHYSICAL",
+			"dsk_FLUSH/s",
+			"dsk_RDTM",    // Total read time (ms)
+			"dsk_WRTM",    // Total write time (ms)
+			"dsk_FLTM",    // Total flush time (ms)
+			"dsk_BLKIO",
 		)
 	}
 	printable := models.Printable{

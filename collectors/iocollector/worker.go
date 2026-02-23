@@ -1,9 +1,12 @@
 package iocollector
 
 import (
-	"kvmtop/config"
-	"kvmtop/models"
-	"kvmtop/util"
+	"fmt"
+
+	"proxtop/config"
+	"proxtop/models"
+	"proxtop/util"
+
 	libvirt "github.com/libvirt/libvirt-go"
 )
 
@@ -23,17 +26,26 @@ func ioCollect(domain *models.Domain) {
 }
 
 func ioPrint(domain *models.Domain) []string {
-	rchar := domain.GetMetricDiffUint64("io_rchar", true)
-	wchar := domain.GetMetricDiffUint64("io_wchar", true)
-	syscr := domain.GetMetricDiffUint64("io_syscr", true)
-	syscw := domain.GetMetricDiffUint64("io_syscw", true)
-	readBytes := domain.GetMetricDiffUint64("io_read_bytes", true)
-	writeBytes := domain.GetMetricDiffUint64("io_write_bytes", true)
+	// Get raw float values for calculations
+	rcharFloat := domain.GetMetricDiffUint64AsFloat("io_rchar", true)
+	wcharFloat := domain.GetMetricDiffUint64AsFloat("io_wchar", true)
+	syscrFloat := domain.GetMetricDiffUint64AsFloat("io_syscr", true)
+	syscwFloat := domain.GetMetricDiffUint64AsFloat("io_syscw", true)
+	readBytesFloat := domain.GetMetricDiffUint64AsFloat("io_read_bytes", true)
+	writeBytesFloat := domain.GetMetricDiffUint64AsFloat("io_write_bytes", true)
 	cancelledWriteBytes := domain.GetMetricDiffUint64("io_cancelled_write_bytes", true)
 
-	result := append([]string{readBytes}, writeBytes)
+	// esxtop style: MBRD/s, MBWR/s, RDOPS (syscalls), WROPS (syscalls)
+	mbRead := fmt.Sprintf("%.2f", readBytesFloat/1024/1024)
+	mbWrite := fmt.Sprintf("%.2f", writeBytesFloat/1024/1024)
+	rdOps := fmt.Sprintf("%.0f", syscrFloat)
+	wrOps := fmt.Sprintf("%.0f", syscwFloat)
+	rchar := fmt.Sprintf("%.0f", rcharFloat)
+	wchar := fmt.Sprintf("%.0f", wcharFloat)
+
+	result := append([]string{mbRead}, mbWrite, rdOps, wrOps)
 	if config.Options.Verbose {
-		result = append(result, rchar, wchar, syscr, syscw, cancelledWriteBytes)
+		result = append(result, rchar, wchar, cancelledWriteBytes)
 	}
 	return result
 }

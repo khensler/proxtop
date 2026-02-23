@@ -3,11 +3,15 @@ package config
 // OptionsType defines the runtime configuration parameters
 type OptionsType struct {
 	Version    bool   `short:"v" long:"version" description:"Show version"`
-	Frequency  int    `short:"f" long:"frequency" description:"Frequency (in seconds) for collecting metrics" default:"1"`
+	Frequency  int    `short:"f" long:"frequency" description:"Frequency (in seconds) for collecting metrics" default:"2"`
 	Runs       int    `short:"r" long:"runs" description:"Amount of collection runs" default:"-1"`
 	LibvirtURI string `short:"c" long:"connection" description:"connection uri to libvirt daemon" default:"qemu:///system"`
 	ProcFS     string `long:"procfs" description:"path to the proc filesystem" default:"/proc"`
 	Verbose    bool   `long:"verbose" description:"Verbose output, adds more detailed fields"`
+
+	// Hypervisor type selection (auto-detected by default)
+	Proxmox bool `long:"proxmox" description:"Force Proxmox VE connector (auto-detected by default)"`
+	Libvirt bool `long:"libvirt" description:"Force libvirt connector (auto-detected by default)"`
 
 	EnableCPU      bool `long:"cpu" description:"enable cpu metrics"`
 	EnableMEM      bool `long:"mem" description:"enable memory metrics"`

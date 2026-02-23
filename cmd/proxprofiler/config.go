@@ -6,19 +6,19 @@ import (
 	"strconv"
 	"strings"
 
-	"kvmtop/collectors/cpucollector"
-	"kvmtop/collectors/iocollector"
-	"kvmtop/collectors/netcollector"
-	"kvmtop/config"
-	"kvmtop/models"
+	"proxtop/collectors/cpucollector"
+	"proxtop/collectors/iocollector"
+	"proxtop/collectors/netcollector"
+	"proxtop/config"
+	"proxtop/models"
 	flags "github.com/jessevdk/go-flags"
 )
 
 func initializeFlags() {
 	// initialize parser for flags
 	parser := flags.NewParser(&config.Options, flags.Default)
-	parser.ShortDescription = "kvmprofiler"
-	parser.LongDescription = "Compute statistical profiles from monitoring data of virtual machines via kvmtop"
+	parser.ShortDescription = "proxprofiler"
+	parser.LongDescription = "Compute statistical profiles from monitoring data of virtual machines via proxtop"
 
 	// Parse parameters
 	if _, err := parser.Parse(); err != nil {

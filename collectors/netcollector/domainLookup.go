@@ -3,7 +3,8 @@ package netcollector
 import (
 	"fmt"
 
-	"kvmtop/models"
+	"proxtop/connector"
+	"proxtop/models"
 	libvirt "github.com/libvirt/libvirt-go"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 )
@@ -35,6 +36,28 @@ func domainLookup(domain *models.Domain, libvirtDomain libvirt.Domain) {
 		for _, devInterface := range domcfg.Devices.Interfaces {
 			if devInterface.Target != nil {
 				ifs = append(ifs, devInterface.Target.Dev)
+			}
+		}
+	}
+
+	newMeasurementInterfaces := models.CreateMeasurement(ifs)
+	domain.AddMetricMeasurement("net_interfaces", newMeasurementInterfaces)
+}
+
+// domainLookupProxmox handles network lookup for Proxmox VMs
+func domainLookupProxmox(domain *models.Domain, vmInfo connector.VMInfo) {
+	var ifs []string
+
+	// Get network interfaces from VMInfo (populated during VM discovery)
+	if len(vmInfo.Interfaces) > 0 {
+		ifs = vmInfo.Interfaces
+	} else {
+		// Try to get interfaces from Proxmox connector
+		proxmoxConn, ok := connector.CurrentConnector.(*connector.ProxmoxConnector)
+		if ok {
+			interfaces, err := proxmoxConn.GetNetworkInterfaces(vmInfo)
+			if err == nil {
+				ifs = interfaces
 			}
 		}
 	}

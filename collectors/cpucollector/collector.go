@@ -1,8 +1,9 @@
 package cpucollector
 
 import (
-	"kvmtop/config"
-	"kvmtop/models"
+	"proxtop/config"
+	"proxtop/connector"
+	"proxtop/models"
 )
 
 // Collector describes the cpu collector
@@ -15,8 +16,15 @@ func (collector *Collector) Lookup() {
 	models.Collection.Domains.Range(func(key, value interface{}) bool {
 		uuid := key.(string)
 		domain := value.(models.Domain)
-		libvirtDomain, _ := models.Collection.LibvirtDomains.Load(uuid)
-		cpuLookup(&domain, libvirtDomain)
+		if connector.IsProxmox() {
+			vmInfo, ok := connector.ProxmoxVMStore.Load(uuid)
+			if ok {
+				cpuLookupProxmox(&domain, vmInfo)
+			}
+		} else {
+			libvirtDomain, _ := models.Collection.LibvirtDomains.Load(uuid)
+			cpuLookup(&domain, libvirtDomain)
+		}
 		return true
 	})
 
@@ -41,35 +49,38 @@ func (collector *Collector) Collect() {
 // Print returns the collectors measurements in a Printable struct
 func (collector *Collector) Print() models.Printable {
 
+	// Host fields - esxtop style naming
 	hostFields := []string{
 		"cpu_cores",
 		"cpu_curfreq",
-		"cpu_user",
-		"cpu_system",
-		"cpu_idle",
-		"cpu_steal",
-		}
+		"cpu_%user",
+		"cpu_%sys",
+		"cpu_%idle",
+		"cpu_%steal",
+		"cpu_%iowait",
+	}
 	if config.Options.Verbose {
 		hostFields = append(hostFields,
 			"cpu_minfreq",
 			"cpu_maxfreq",
-			"cpu_nice",
-			"cpu_iowait",
-			"cpu_irq",
-			"cpu_softirq",
-			"cpu_guest",
-			"cpu_guestnice",
+			"cpu_%nice",
+			"cpu_%irq",
+			"cpu_%softirq",
+			"cpu_%guest",
+			"cpu_%guestnice",
 		)
 	}
+	// Domain fields - esxtop style: %USED (cpu time), %RDY (queue/steal time)
 	domainFields := []string{
 		"cpu_cores",
-		"cpu_total",
-		"cpu_steal",
+		"cpu_%used",
+		"cpu_%rdy",
+		"cpu_%sys",
 	}
 	if config.Options.Verbose {
 		domainFields = append(domainFields,
-			"cpu_other_total",
-			"cpu_other_steal",
+			"cpu_%other",
+			"cpu_%othrdy",
 		)
 	}
 	printable := models.Printable{
