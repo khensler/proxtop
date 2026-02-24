@@ -1,6 +1,8 @@
 package netcollector
 
 import (
+	"fmt"
+
 	"proxtop/models"
 	"proxtop/util"
 )
@@ -46,4 +48,14 @@ func hostCollect(host *models.Host) {
 	host.AddMetricMeasurement("net_host_TransmittedColls", models.CreateMeasurement(uint64(statsSum.TransmittedColls)))
 	host.AddMetricMeasurement("net_host_TransmittedCarrier", models.CreateMeasurement(uint64(statsSum.TransmittedCarrier)))
 	host.AddMetricMeasurement("net_host_TransmittedCompressed", models.CreateMeasurement(uint64(statsSum.TransmittedCompressed)))
+
+	// Collect per-device stats for physical network view (enables rate calculations)
+	physicalDevices := util.GetPhysicalNetDevices()
+	for name, dev := range physicalDevices {
+		prefix := fmt.Sprintf("net_physdev_%s_", name)
+		host.AddMetricMeasurement(prefix+"ReceivedBytes", models.CreateMeasurement(uint64(dev.ReceivedBytes)))
+		host.AddMetricMeasurement(prefix+"ReceivedPackets", models.CreateMeasurement(uint64(dev.ReceivedPackets)))
+		host.AddMetricMeasurement(prefix+"TransmittedBytes", models.CreateMeasurement(uint64(dev.TransmittedBytes)))
+		host.AddMetricMeasurement(prefix+"TransmittedPackets", models.CreateMeasurement(uint64(dev.TransmittedPackets)))
+	}
 }

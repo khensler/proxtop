@@ -108,6 +108,22 @@ func diskHostLookup(host *models.Host) {
 	host.AddMetricMeasurement("disk_device_timeforops", models.CreateMeasurement(combinedDiskstat.TimeForOps))
 	host.AddMetricMeasurement("disk_device_weightedtimeforops", models.CreateMeasurement(combinedDiskstat.WeightedTimeForOps))
 	host.AddMetricMeasurement("disk_device_count", models.CreateMeasurement(combinedDiskstatCounts))
+
+	// Store per-device stats for physical disk view (enables rate calculations)
+	allDiskstats := util.GetProcDiskstats()
+	for name, dev := range allDiskstats {
+		// Filter out loop, ram, dm- devices
+		if strings.HasPrefix(name, "loop") || strings.HasPrefix(name, "ram") || strings.HasPrefix(name, "dm-") {
+			continue
+		}
+		prefix := fmt.Sprintf("disk_physdev_%s_", name)
+		host.AddMetricMeasurement(prefix+"reads", models.CreateMeasurement(dev.Reads))
+		host.AddMetricMeasurement(prefix+"writes", models.CreateMeasurement(dev.Writes))
+		host.AddMetricMeasurement(prefix+"sectorsread", models.CreateMeasurement(dev.SectorsRead))
+		host.AddMetricMeasurement(prefix+"sectorswritten", models.CreateMeasurement(dev.SectorsWritten))
+		host.AddMetricMeasurement(prefix+"timeforops", models.CreateMeasurement(dev.TimeForOps))
+		host.AddMetricMeasurement(prefix+"weightedtimeforops", models.CreateMeasurement(dev.WeightedTimeForOps))
+	}
 }
 
 func diskHostCollect(host *models.Host) {
@@ -333,6 +349,7 @@ func HostDiskFields() []string {
 func HostPrintPerDevice() map[string][]string {
 	diskstats := util.GetProcDiskstats()
 	result := make(map[string][]string)
+	host := &models.Collection.Host
 
 	// Filter out loop, ram, dm- devices
 	for name, dev := range diskstats {
@@ -340,31 +357,49 @@ func HostPrintPerDevice() map[string][]string {
 			continue
 		}
 
-		// Calculate per-second rates (approximation - we don't have previous values here)
-		// For now, show raw counters; proper rates would require storing previous values
-		reads := fmt.Sprintf("%d", dev.Reads)
-		writes := fmt.Sprintf("%d", dev.Writes)
-		mbRead := fmt.Sprintf("%.2f", float64(dev.SectorsRead)*512/1024/1024)
-		mbWrite := fmt.Sprintf("%.2f", float64(dev.SectorsWritten)*512/1024/1024)
+		prefix := fmt.Sprintf("disk_physdev_%s_", name)
 
-		// %UTIL approximation (time for ops / total time * 100) - need interval for accuracy
-		util := fmt.Sprintf("%d", dev.TimeForOps)
+		// Calculate per-second rates using stored metrics
+		readsRate := host.GetMetricDiffUint64AsFloat(prefix+"reads", true)
+		writesRate := host.GetMetricDiffUint64AsFloat(prefix+"writes", true)
+		reads := fmt.Sprintf("%.0f", readsRate)
+		writes := fmt.Sprintf("%.0f", writesRate)
 
-		// Queue depth (current ops in flight)
+		// Calculate MB/s from sectors (512 bytes each)
+		sectorsReadRate := host.GetMetricDiffUint64AsFloat(prefix+"sectorsread", true)
+		sectorsWrittenRate := host.GetMetricDiffUint64AsFloat(prefix+"sectorswritten", true)
+		mbRead := fmt.Sprintf("%.2f", sectorsReadRate*512/1024/1024)
+		mbWrite := fmt.Sprintf("%.2f", sectorsWrittenRate*512/1024/1024)
+
+		// %UTIL: time spent doing I/O (ms/s), divided by 1000ms = percentage
+		// TimeForOps is cumulative ms spent doing I/O, diff gives ms/s
+		timeForOpsRate := host.GetMetricDiffUint64AsFloat(prefix+"timeforops", true)
+		utilPct := timeForOpsRate / 10 // ms/s to percentage (1000ms = 100%)
+		if utilPct > 100 {
+			utilPct = 100 // Cap at 100%
+		}
+		utilStr := fmt.Sprintf("%.0f", utilPct)
+
+		// Queue depth (current ops in flight) - instantaneous value
 		qDepth := fmt.Sprintf("%d", dev.CurrentOps)
 
-		// Service time (ms per op)
-		totalOps := dev.Reads + dev.Writes
-		var svcTm, await string
-		if totalOps > 0 {
-			svcTm = fmt.Sprintf("%.2f", float64(dev.TimeForOps)/float64(totalOps))
-			await = fmt.Sprintf("%.2f", float64(dev.WeightedTimeForOps)/float64(totalOps))
+		// Calculate SVCTM and AWAIT using rate values
+		// SVCTM = time spent on completed I/O / number of completed I/Os
+		// AWAIT = weighted time / number of completed I/Os
+		totalOpsRate := readsRate + writesRate
+		var svcTm, awaitStr string
+		if totalOpsRate > 0.1 { // Avoid division by very small numbers
+			// SVCTM: average service time per I/O
+			svcTm = fmt.Sprintf("%.2f", timeForOpsRate/totalOpsRate)
+			// AWAIT: average wait time per I/O (includes queue time)
+			weightedTimeRate := host.GetMetricDiffUint64AsFloat(prefix+"weightedtimeforops", true)
+			awaitStr = fmt.Sprintf("%.2f", weightedTimeRate/totalOpsRate)
 		} else {
 			svcTm = "0.00"
-			await = "0.00"
+			awaitStr = "0.00"
 		}
 
-		values := []string{name, reads, writes, mbRead, mbWrite, util, qDepth, svcTm, await}
+		values := []string{name, reads, writes, mbRead, mbWrite, utilStr, qDepth, svcTm, awaitStr}
 
 		if config.Options.Verbose {
 			values = append(values,

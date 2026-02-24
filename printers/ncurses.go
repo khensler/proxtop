@@ -222,6 +222,16 @@ func (printer *NcursesPrinter) Open() {
 	hiddenFields["net_TX-Colls"] = true
 	hiddenFields["net_TX-Carrier"] = true
 	hiddenFields["net_TX-Compressed"] = true
+
+	// Physical network raw counters (hidden by default - rates are more useful)
+	hiddenFields["net_RX-Bytes"] = true
+	hiddenFields["net_RX-Pkts"] = true
+	hiddenFields["net_RX-Errs"] = true
+	hiddenFields["net_RX-Drop"] = true
+	hiddenFields["net_TX-Bytes"] = true
+	hiddenFields["net_TX-Pkts"] = true
+	hiddenFields["net_TX-Errs"] = true
+	hiddenFields["net_TX-Drop"] = true
 }
 
 // handleInput processes keyboard input and returns true if we should quit

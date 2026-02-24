@@ -489,3 +489,10 @@ disk_device_servicetime = Δweightedtimeforops / (Δreads + Δreadsmerged + Δwr
 
 9. **Physical Device Views**: Press `p` for physical network interfaces or `s` for physical disk devices. These views use the same field selector as VM views - press `f` to show/hide columns.
 
+10. **Physical Network Interface Metrics** (`p` key in ncurses): Per-interface statistics from `/proc/net/dev` with calculated rates:
+    - `net_MbRX/s` = Megabits/sec received
+    - `net_MbTX/s` = Megabits/sec transmitted
+    - `net_PKTRX/s` = Packets/sec received
+    - `net_PKTTX/s` = Packets/sec transmitted
+    - Raw counters (RX-Bytes, TX-Bytes, etc.) are also available via field selector
+

@@ -47,6 +47,10 @@ func hostPrint(host *models.Host) []string {
 func HostNetFields() []string {
 	fields := []string{
 		"net_DEVICE",
+		"net_MbRX/s",
+		"net_MbTX/s",
+		"net_PKTRX/s",
+		"net_PKTTX/s",
 		"net_RX-Bytes",
 		"net_RX-Pkts",
 		"net_RX-Errs",
@@ -76,10 +80,28 @@ func HostNetFields() []string {
 func HostPrintPerDevice() map[string][]string {
 	devices := util.GetPhysicalNetDevices()
 	result := make(map[string][]string)
+	host := &models.Collection.Host
 
 	for name, dev := range devices {
+		// Calculate rates using stored metrics
+		prefix := fmt.Sprintf("net_physdev_%s_", name)
+		rxBytesRate := host.GetMetricDiffUint64AsFloat(prefix+"ReceivedBytes", true)
+		txBytesRate := host.GetMetricDiffUint64AsFloat(prefix+"TransmittedBytes", true)
+		rxPktsRate := host.GetMetricDiffUint64AsFloat(prefix+"ReceivedPackets", true)
+		txPktsRate := host.GetMetricDiffUint64AsFloat(prefix+"TransmittedPackets", true)
+
+		// Convert bytes/s to Mb/s (megabits per second)
+		mbRx := fmt.Sprintf("%.2f", rxBytesRate*8/1000000)
+		mbTx := fmt.Sprintf("%.2f", txBytesRate*8/1000000)
+		pktRx := fmt.Sprintf("%.0f", rxPktsRate)
+		pktTx := fmt.Sprintf("%.0f", txPktsRate)
+
 		values := []string{
 			name,
+			mbRx,
+			mbTx,
+			pktRx,
+			pktTx,
 			fmt.Sprintf("%d", dev.ReceivedBytes),
 			fmt.Sprintf("%d", dev.ReceivedPackets),
 			fmt.Sprintf("%d", dev.ReceivedErrs),
