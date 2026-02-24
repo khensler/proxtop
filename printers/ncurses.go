@@ -30,6 +30,8 @@ const (
 	ViewIO
 	ViewPhysNet  // Physical network interfaces
 	ViewPhysDisk // Physical disk devices
+	ViewLVM      // LVM logical volumes
+	ViewMpath    // Multipath devices
 	ViewHelp
 )
 
@@ -315,6 +317,14 @@ func handleInput() bool {
 		currentViewMode = ViewPhysDisk
 		showHelpOverlay = false
 		helpDrawn = false
+	case 'l', 'L':
+		currentViewMode = ViewLVM
+		showHelpOverlay = false
+		helpDrawn = false
+	case 'x', 'X':
+		currentViewMode = ViewMpath
+		showHelpOverlay = false
+		helpDrawn = false
 	case '<':
 		if currentSortColumn > 0 {
 			currentSortColumn--
@@ -356,6 +366,10 @@ func getViewModeName() string {
 		return "PHYS-NET"
 	case ViewPhysDisk:
 		return "PHYS-DISK"
+	case ViewLVM:
+		return "LVM"
+	case ViewMpath:
+		return "MULTIPATH"
 	default:
 		return "ALL"
 	}
@@ -510,17 +524,23 @@ func (printer *NcursesPrinter) Screen(printable models.Printable) {
 	screen.AttrOff(goncurses.A_REVERSE)
 
 	// Handle physical device views differently
-	if currentViewMode == ViewPhysNet || currentViewMode == ViewPhysDisk {
+	if currentViewMode == ViewPhysNet || currentViewMode == ViewPhysDisk ||
+		currentViewMode == ViewLVM || currentViewMode == ViewMpath {
 		// Use full screen for device list (no host panel)
 		deviceWin, _ := goncurses.NewWindow(maxy-1, maxx, 1, 0)
 		goncurses.UpdatePanels()
 		goncurses.Update()
 		goncurses.NewPanel(deviceWin)
 
-		if currentViewMode == ViewPhysNet {
+		switch currentViewMode {
+		case ViewPhysNet:
 			printPhysicalNetDevices(deviceWin)
-		} else {
+		case ViewPhysDisk:
 			printPhysicalDiskDevices(deviceWin)
+		case ViewLVM:
+			printLVMDevices(deviceWin)
+		case ViewMpath:
+			printMpathDevices(deviceWin)
 		}
 
 		screen.NoutRefresh()
@@ -712,7 +732,7 @@ func filterHostFieldsByView(fields []string, values []string) ([]string, []strin
 func printHelpOverlay(maxy, maxx int) {
 	// Center the help box
 	helpWidth := 50
-	helpHeight := 29
+	helpHeight := 33
 	startY := (maxy - helpHeight) / 2
 	startX := (maxx - helpWidth) / 2
 
@@ -745,7 +765,7 @@ func printHelpOverlay(maxy, maxx int) {
 	helpWin.AttrOff(goncurses.A_BOLD)
 
 	helpWin.Move(3, 2)
-	helpWin.Printf("View Modes:")
+	helpWin.Printf("VM Views:")
 	helpWin.Move(4, 4)
 	helpWin.Printf("a - Show ALL metrics")
 	helpWin.Move(5, 4)
@@ -758,36 +778,43 @@ func printHelpOverlay(maxy, maxx int) {
 	helpWin.Printf("n - Show NETWORK metrics")
 	helpWin.Move(9, 4)
 	helpWin.Printf("i - Show I/O metrics")
-	helpWin.Move(10, 4)
-	helpWin.Printf("p - Show PHYSICAL NETWORK interfaces")
-	helpWin.Move(11, 4)
-	helpWin.Printf("s - Show PHYSICAL DISK devices")
 
-	helpWin.Move(13, 2)
-	helpWin.Printf("Sorting:")
+	helpWin.Move(11, 2)
+	helpWin.Printf("Host Device Views:")
+	helpWin.Move(12, 4)
+	helpWin.Printf("p - PHYSICAL NETWORK interfaces")
+	helpWin.Move(13, 4)
+	helpWin.Printf("s - PHYSICAL DISK devices (sd*, nvme*, vd*)")
 	helpWin.Move(14, 4)
-	helpWin.Printf("< - Sort by previous column")
+	helpWin.Printf("l - LVM logical volumes")
 	helpWin.Move(15, 4)
+	helpWin.Printf("x - MULTIPATH devices")
+
+	helpWin.Move(17, 2)
+	helpWin.Printf("Sorting:")
+	helpWin.Move(18, 4)
+	helpWin.Printf("< - Sort by previous column")
+	helpWin.Move(19, 4)
 	helpWin.Printf("> - Sort by next column")
-	helpWin.Move(16, 4)
+	helpWin.Move(20, 4)
 	helpWin.Printf("r - Reverse sort direction (asc/desc)")
 
-	helpWin.Move(18, 2)
+	helpWin.Move(22, 2)
 	helpWin.Printf("Display:")
-	helpWin.Move(19, 4)
+	helpWin.Move(23, 4)
 	helpWin.Printf("u - Toggle human-readable units (KB/MB/GB)")
-	helpWin.Move(20, 4)
+	helpWin.Move(24, 4)
 	helpWin.Printf("+ - Increase refresh interval (slower)")
-	helpWin.Move(21, 4)
+	helpWin.Move(25, 4)
 	helpWin.Printf("- - Decrease refresh interval (faster)")
 
-	helpWin.Move(23, 2)
+	helpWin.Move(27, 2)
 	helpWin.Printf("Other:")
-	helpWin.Move(24, 4)
+	helpWin.Move(28, 4)
 	helpWin.Printf("f - Field selector (show/hide columns)")
-	helpWin.Move(25, 4)
+	helpWin.Move(29, 4)
 	helpWin.Printf("h/? - Toggle this help")
-	helpWin.Move(26, 4)
+	helpWin.Move(30, 4)
 	helpWin.Printf("q   - Quit (also Ctrl+C)")
 
 	helpWin.NoutRefresh()
@@ -909,7 +936,7 @@ func filterFieldsForSelector(domainFields []string) []string {
 			}
 		}
 		return filtered
-	case ViewPhysDisk:
+	case ViewPhysDisk, ViewLVM, ViewMpath:
 		// Get fields from disk collector (skip first "DEVICE" column)
 		physFields := diskcollector.HostDiskFields()
 		for i, field := range physFields {
@@ -1426,13 +1453,12 @@ func printPhysicalNetDevices(window *goncurses.Window) {
 	window.NoutRefresh()
 }
 
-// printPhysicalDiskDevices displays physical disk device statistics
-func printPhysicalDiskDevices(window *goncurses.Window) {
+// printDiskDeviceView is a helper that displays disk devices from a specific category
+func printDiskDeviceView(window *goncurses.Window, deviceData map[string][]string) {
 	maxy, maxx := window.MaxYX()
 
-	// Get fields and data from collector
+	// Get fields from collector
 	allFields := diskcollector.HostDiskFields()
-	allDeviceData := diskcollector.HostPrintPerDevice()
 
 	// Filter fields based on hiddenFields (but always keep DEVICE column)
 	visibleFields := []string{}
@@ -1444,13 +1470,13 @@ func printPhysicalDiskDevices(window *goncurses.Window) {
 		}
 	}
 
-	// Build data rows with only visible columns
+	// Build rows from device data
 	type diskDevRow struct {
 		name   string
 		values []string
 	}
-	rows := make([]diskDevRow, 0, len(allDeviceData))
-	for name, vals := range allDeviceData {
+	rows := make([]diskDevRow, 0, len(deviceData))
+	for name, vals := range deviceData {
 		visibleVals := make([]string, len(visibleIndices))
 		for vi, origIdx := range visibleIndices {
 			if origIdx < len(vals) {
@@ -1460,20 +1486,18 @@ func printPhysicalDiskDevices(window *goncurses.Window) {
 		rows = append(rows, diskDevRow{name: name, values: visibleVals})
 	}
 
-	// Sort by selected column
+	// Sort rows
 	sortCol := currentSortColumn
 	if sortCol >= len(visibleFields) {
 		sortCol = 0
 	}
 	sort.Slice(rows, func(i, j int) bool {
 		if sortCol == 0 {
-			// Sort by name alphabetically
 			if sortAscending {
 				return rows[i].name < rows[j].name
 			}
 			return rows[i].name > rows[j].name
 		}
-		// Parse as float for numeric comparison
 		vi, _ := strconv.ParseFloat(rows[i].values[sortCol], 64)
 		vj, _ := strconv.ParseFloat(rows[j].values[sortCol], 64)
 		if sortAscending {
@@ -1482,11 +1506,11 @@ func printPhysicalDiskDevices(window *goncurses.Window) {
 		return vi > vj
 	})
 
-	// Calculate column widths dynamically (add space for sort indicator)
+	// Calculate column widths
 	widths := make([]int, len(visibleFields))
 	for i, field := range visibleFields {
 		fieldName := strings.TrimPrefix(field, "dsk_")
-		widths[i] = len(fieldName) + 1 // +1 for sort indicator
+		widths[i] = len(fieldName) + 1
 		if widths[i] < 8 {
 			widths[i] = 8
 		}
@@ -1499,11 +1523,10 @@ func printPhysicalDiskDevices(window *goncurses.Window) {
 		}
 	}
 
-	// Print header with sort indicator
+	// Print header
 	window.Move(0, 0)
 	for i, field := range visibleFields {
 		fieldName := strings.TrimPrefix(field, "dsk_")
-		// Add sort direction indicator
 		if i == sortCol {
 			if sortAscending {
 				fieldName = fieldName + "^"
@@ -1548,4 +1571,22 @@ func printPhysicalDiskDevices(window *goncurses.Window) {
 	}
 
 	window.NoutRefresh()
+}
+
+// printPhysicalDiskDevices displays physical disk device statistics (sd*, nvme*, vd*, etc.)
+func printPhysicalDiskDevices(window *goncurses.Window) {
+	categorized := diskcollector.HostPrintPerDeviceCategorized()
+	printDiskDeviceView(window, categorized.Physical)
+}
+
+// printLVMDevices displays LVM logical volume statistics
+func printLVMDevices(window *goncurses.Window) {
+	categorized := diskcollector.HostPrintPerDeviceCategorized()
+	printDiskDeviceView(window, categorized.LVM)
+}
+
+// printMpathDevices displays multipath device statistics
+func printMpathDevices(window *goncurses.Window) {
+	categorized := diskcollector.HostPrintPerDeviceCategorized()
+	printDiskDeviceView(window, categorized.Mpath)
 }

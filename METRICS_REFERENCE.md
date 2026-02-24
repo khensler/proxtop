@@ -496,3 +496,23 @@ disk_device_servicetime = Δweightedtimeforops / (Δreads + Δreadsmerged + Δwr
     - `net_PKTTX/s` = Packets/sec transmitted
     - Raw counters (RX-Bytes, TX-Bytes, etc.) are also available via field selector
 
+11. **Physical Disk Device Metrics** (`s` key in ncurses): Per-device statistics from `/proc/diskstats` with calculated rates:
+    - `dsk_READS/s` = Read operations per second
+    - `dsk_WRITES/s` = Write operations per second
+    - `dsk_MBRD/s` = MB/sec read throughput
+    - `dsk_MBWR/s` = MB/sec write throughput
+    - `dsk_%UTIL` = Device busy percentage (0-100%)
+    - `dsk_QDEPTH` = Current queue depth (I/Os in flight)
+    - `dsk_SVCTM` = Average service time per I/O (ms)
+    - `dsk_AWAIT` = Average wait time per I/O including queue time (ms)
+
+12. **Host Storage Device Views**: Three separate views for different storage types, each with the same metrics as above:
+
+    - **Physical Disks** (`s` key): SCSI/SATA (`sd*`), NVMe (`nvme*`), virtio (`vd*`), partitions (`sda1`, etc.)
+    - **LVM Volumes** (`l` key): LVM logical volumes (detected via `LVM-` UUID prefix in `/sys/block/dm-*/dm/uuid`)
+    - **Multipath Devices** (`x` key): DM-Multipath devices (detected via `mpath-` UUID prefix in `/sys/block/dm-*/dm/uuid`)
+
+    Device mapper devices (`dm-*`) are displayed with their friendly names from `/dev/mapper/` instead of the raw `dm-X` name.
+
+    Excluded from all views: `loop*` (loopback), `ram*` (RAM disks)
+

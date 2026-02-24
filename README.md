@@ -37,7 +37,7 @@
 | Streaming to TSDB | ❌ requires vROps | ✅ built-in TCP to Logstash/InfluxDB |
 | Human-readable units | ✅ | ✅ press 'u' or use -H flag |
 | Sort direction toggle | ✅ | ✅ press 'r' for asc/desc |
-| Physical device views | ✅ | ✅ press 'p' (net) or 's' (disk) |
+| Physical device views | ✅ | ✅ press 'p' (net), 's' (disk), 'l' (LVM), 'x' (mpath) |
 
 If you're migrating from VMware to Proxmox or KVM, proxtop provides the same hypervisor-level visibility you're used to with esxtop.
 

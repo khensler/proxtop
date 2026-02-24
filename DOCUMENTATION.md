@@ -418,7 +418,9 @@ Optimized for Proxmox VE environments using QMP directly.
 | `n` / `N` | Network metrics only |
 | `i` / `I` | I/O metrics only |
 | `p` / `P` | Physical network interfaces |
-| `s` / `S` | Physical storage devices |
+| `s` / `S` | Physical storage devices (sd*, nvme*, vd*) |
+| `l` / `L` | LVM logical volumes |
+| `x` / `X` | Multipath devices |
 | `<` / `>` | Change sort column |
 | `r` / `R` | Reverse sort direction (ascending/descending) |
 | `+` / `-` | Increase/decrease refresh interval |

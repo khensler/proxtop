@@ -112,8 +112,9 @@ func diskHostLookup(host *models.Host) {
 	// Store per-device stats for physical disk view (enables rate calculations)
 	allDiskstats := util.GetProcDiskstats()
 	for name, dev := range allDiskstats {
-		// Filter out loop, ram, dm- devices
-		if strings.HasPrefix(name, "loop") || strings.HasPrefix(name, "ram") || strings.HasPrefix(name, "dm-") {
+		// Filter out loop and ram devices only
+		// Include: physical disks (sd*, nvme*, etc.), LVM (dm-*), multipath (mpath*)
+		if strings.HasPrefix(name, "loop") || strings.HasPrefix(name, "ram") {
 			continue
 		}
 		prefix := fmt.Sprintf("disk_physdev_%s_", name)
@@ -344,17 +345,54 @@ func HostDiskFields() []string {
 	return fields
 }
 
+// CategorizedDiskStats holds disk stats organized by device type
+type CategorizedDiskStats struct {
+	Physical map[string][]string // Physical disks (sd*, nvme*, etc.)
+	LVM      map[string][]string // LVM logical volumes
+	Mpath    map[string][]string // Multipath devices
+}
+
 // HostPrintPerDevice returns per-device disk stats for physical disk view
 // Returns a map of device name -> []string (field values in same order as HostDiskFields)
 func HostPrintPerDevice() map[string][]string {
-	diskstats := util.GetProcDiskstats()
+	categorized := HostPrintPerDeviceCategorized()
+	// Merge all categories into a single map for backward compatibility
 	result := make(map[string][]string)
-	host := &models.Collection.Host
+	for name, vals := range categorized.Physical {
+		result[name] = vals
+	}
+	for name, vals := range categorized.LVM {
+		result[name] = vals
+	}
+	for name, vals := range categorized.Mpath {
+		result[name] = vals
+	}
+	return result
+}
 
-	// Filter out loop, ram, dm- devices
+// HostPrintPerDeviceCategorized returns per-device disk stats organized by device type
+func HostPrintPerDeviceCategorized() CategorizedDiskStats {
+	diskstats := util.GetProcDiskstats()
+	host := &models.Collection.Host
+	dmMap := util.GetDeviceMapperNames()
+
+	result := CategorizedDiskStats{
+		Physical: make(map[string][]string),
+		LVM:      make(map[string][]string),
+		Mpath:    make(map[string][]string),
+	}
+
 	for name, dev := range diskstats {
-		if strings.HasPrefix(name, "loop") || strings.HasPrefix(name, "ram") || strings.HasPrefix(name, "dm-") {
+		// Classify the device
+		deviceType := util.ClassifyDiskDevice(name, dmMap)
+		if deviceType == "skip" {
 			continue
+		}
+
+		// Use friendly name for dm-* devices
+		displayName := name
+		if strings.HasPrefix(name, "dm-") {
+			displayName = util.GetDMFriendlyName(name, dmMap)
 		}
 
 		prefix := fmt.Sprintf("disk_physdev_%s_", name)
@@ -372,7 +410,6 @@ func HostPrintPerDevice() map[string][]string {
 		mbWrite := fmt.Sprintf("%.2f", sectorsWrittenRate*512/1024/1024)
 
 		// %UTIL: time spent doing I/O (ms/s), divided by 1000ms = percentage
-		// TimeForOps is cumulative ms spent doing I/O, diff gives ms/s
 		timeForOpsRate := host.GetMetricDiffUint64AsFloat(prefix+"timeforops", true)
 		utilPct := timeForOpsRate / 10 // ms/s to percentage (1000ms = 100%)
 		if utilPct > 100 {
@@ -384,14 +421,10 @@ func HostPrintPerDevice() map[string][]string {
 		qDepth := fmt.Sprintf("%d", dev.CurrentOps)
 
 		// Calculate SVCTM and AWAIT using rate values
-		// SVCTM = time spent on completed I/O / number of completed I/Os
-		// AWAIT = weighted time / number of completed I/Os
 		totalOpsRate := readsRate + writesRate
 		var svcTm, awaitStr string
-		if totalOpsRate > 0.1 { // Avoid division by very small numbers
-			// SVCTM: average service time per I/O
+		if totalOpsRate > 0.1 {
 			svcTm = fmt.Sprintf("%.2f", timeForOpsRate/totalOpsRate)
-			// AWAIT: average wait time per I/O (includes queue time)
 			weightedTimeRate := host.GetMetricDiffUint64AsFloat(prefix+"weightedtimeforops", true)
 			awaitStr = fmt.Sprintf("%.2f", weightedTimeRate/totalOpsRate)
 		} else {
@@ -399,7 +432,7 @@ func HostPrintPerDevice() map[string][]string {
 			awaitStr = "0.00"
 		}
 
-		values := []string{name, reads, writes, mbRead, mbWrite, utilStr, qDepth, svcTm, awaitStr}
+		values := []string{displayName, reads, writes, mbRead, mbWrite, utilStr, qDepth, svcTm, awaitStr}
 
 		if config.Options.Verbose {
 			values = append(values,
@@ -414,7 +447,17 @@ func HostPrintPerDevice() map[string][]string {
 			)
 		}
 
-		result[name] = values
+		// Add to appropriate category
+		switch deviceType {
+		case "physical":
+			result.Physical[displayName] = values
+		case "lvm":
+			result.LVM[displayName] = values
+		case "mpath":
+			result.Mpath[displayName] = values
+		default:
+			result.Physical[displayName] = values
+		}
 	}
 
 	return result
