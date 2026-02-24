@@ -15,7 +15,7 @@ import (
 	"proxtop/runners"
 )
 
-var version = "1.1.3-1"
+var version = "1.1.6-1"
 
 func main() {
 

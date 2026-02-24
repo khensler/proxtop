@@ -1,3 +1,7 @@
+proxtop (1.1.6-1) stable; urgency=medium
+  * Fixed physical disk view %UTIL calculation (was showing 0)
+  * Physical disk view now shows proper per-second rates for all metrics
+
 proxtop (1.1.4-1) stable; urgency=medium
   * Fixed PSI collector not returning all metrics in non-verbose mode
   * Text printer now displays host-level metrics (PSI, CPU host stats, etc.)
