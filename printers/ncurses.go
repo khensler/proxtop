@@ -333,7 +333,6 @@ func handleInput() bool {
 		currentSortColumn++
 	case 'r', 'R': // Toggle sort direction (reverse)
 		sortAscending = !sortAscending
-		runners.ForceRefresh = true
 	case '+', '=': // Increase refresh interval
 		if config.Options.Frequency < 60 {
 			config.Options.Frequency++
@@ -344,8 +343,9 @@ func handleInput() bool {
 		}
 	case 'u', 'U': // Toggle human-readable units
 		config.Options.HumanReadable = !config.Options.HumanReadable
-		runners.ForceRefresh = true
 	}
+	// Force immediate screen refresh on any input
+	runners.ForceRefresh = true
 	return false
 }
 
