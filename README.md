@@ -59,7 +59,7 @@ For detailed information, see the following documentation:
 |----------|-------------|
 | [DOCUMENTATION.md](DOCUMENTATION.md) | Comprehensive guide covering installation, configuration, collectors, output formats, deployment, and troubleshooting |
 | [METRICS_REFERENCE.md](METRICS_REFERENCE.md) | Complete reference of all collected metrics with sources, descriptions, and calculation formulas |
-| [docs/README.md](docs/README.md) | Technical metric collector documentation |
+| [CHANGELOG.md](CHANGELOG.md) | Version history and release notes |
 
 ## Installation
 
